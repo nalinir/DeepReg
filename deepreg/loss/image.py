@@ -230,7 +230,7 @@ class LocalNormalizedCrossCorrelation(tf.keras.losses.Loss):
         p_var = tf.maximum(p_var, 0)
 
         # (E[tp] - E[p] * E[t]) ** 2 / V[t] / V[p]
-        ncc = (cross * cross + self.smooth_nr) / (t_var * p_var + self.smooth_dr)
+        ncc = (cross * cross) / (t_var * p_var + self.smooth_dr)
 
         return ncc
 
@@ -327,7 +327,7 @@ class GlobalNormalizedCrossCorrelation(tf.keras.losses.Loss):
             tf.reduce_mean((y_pred - mu_pred) * (y_true - mu_true), axis=axis)
         )
 
-        return (numerator * numerator + EPS/10) / (var_pred * var_true + EPS)
+        return (numerator * numerator) / (var_pred * var_true + EPS)
 
 
 @REGISTRY.register_loss(name="gncc")
