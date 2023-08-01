@@ -148,7 +148,7 @@ class LocalNormalizedCrossCorrelation(tf.keras.losses.Loss):
         self,
         kernel_size: int = 9,
         kernel_type: str = "rectangular",
-        smooth_nr: float = EPS,
+        smooth_nr: float = EPS/10,
         smooth_dr: float = EPS,
         name: str = "LocalNormalizedCrossCorrelation",
         **kwargs,
@@ -327,7 +327,7 @@ class GlobalNormalizedCrossCorrelation(tf.keras.losses.Loss):
             tf.reduce_mean((y_pred - mu_pred) * (y_true - mu_true), axis=axis)
         )
 
-        return (numerator * numerator + EPS) / (var_pred * var_true + EPS)
+        return (numerator * numerator + EPS/10) / (var_pred * var_true + EPS)
 
 
 @REGISTRY.register_loss(name="gncc")
