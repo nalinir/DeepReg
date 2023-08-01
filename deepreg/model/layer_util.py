@@ -321,6 +321,16 @@ def resample(
     # batch_coords[b, l1, ..., lm] = b
     # range(batch_size) on axis 0 and repeated on other axes
     # add batch coords manually is faster than using batch_dims in tf.gather_nd
+    # TODO: added if statements to fix the None batch size issue
+    if batch_size == None:
+        # TODO: need to reset batch size here everytime changing training
+        # setting
+        batch_size = 4
+        print(f"Found batch size None so set batch size to {batch_size}")
+
+    # batch_coords[b, l1, ..., lm] = b
+    # range(batch_size) on axis 0 and repeated on other axes
+    # add batch coords manually is faster than using batch_dims in tf.gather_nd
     batch_coords = tf.tile(
         tf.reshape(tf.range(batch_size), [batch_size] + [1] * len(loc_shape)),
         [1] + loc_shape,
