@@ -197,6 +197,8 @@ def pyramid_combination(
         )
 
     if len(weight_floor) == 1:  # one dimension
+        if interpolation == "nearest":
+            return tf.where(weight_floor[0] > weight_ceil[0], values[0], values[1])
         return values[0] * weight_floor[0] + values[1] * weight_ceil[0]
     # multi dimension
     values_floor = pyramid_combination(
