@@ -260,7 +260,7 @@ class Warping(tfkl.Layer):
         :return: shape = (batch, f_dim1, f_dim2, f_dim3)
         """
         ddf, image = inputs
-        return layer_util.resample(vol=image, loc=self.grid_ref + ddf, self.interpolation)
+        return layer_util.resample(vol=image, loc=self.grid_ref + ddf, interpolation=self.interpolation)
 
     def get_config(self) -> dict:
         """Return the config dictionary for recreating this class."""
