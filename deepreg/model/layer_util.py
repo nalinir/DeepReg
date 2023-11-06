@@ -298,7 +298,7 @@ def resample(
     # each tensor is the weight for the corner of floor coordinates
     # each tensor's shape is (batch, *loc_shape) if volume has no feature channel
     #                        (batch, *loc_shape, 1) if volume has feature channel
-    loc_floor_ceil, loc_nn, weight_floor, weight_ceil = [], [], []
+    loc_floor_ceil, loc_nn, weight_floor, weight_ceil = [], [], [], []
     # using for loop is faster than using list comprehension
     for dim in range(dim_vol):
         # shape = (batch, *loc_shape)
