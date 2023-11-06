@@ -232,7 +232,8 @@ class Warping(tfkl.Layer):
     where vol = image, loc_shift = ddf
     """
 
-    def __init__(self, fixed_image_size: tuple, name: str = "warping", **kwargs):
+    def __init__(self, fixed_image_size: tuple, name: str = "warping", 
+                 interpolation: str = "linear", **kwargs):
         """
         Init.
 
@@ -247,6 +248,7 @@ class Warping(tfkl.Layer):
         self.grid_ref = layer_util.get_reference_grid(grid_size=fixed_image_size)[
             None, ...
         ]
+        self.interpolation = interpolation
 
     def call(self, inputs, **kwargs) -> tf.Tensor:
         """
@@ -258,7 +260,7 @@ class Warping(tfkl.Layer):
         :return: shape = (batch, f_dim1, f_dim2, f_dim3)
         """
         ddf, image = inputs
-        return layer_util.resample(vol=image, loc=self.grid_ref + ddf)
+        return layer_util.resample(vol=image, loc=self.grid_ref + ddf, self.interpolation)
 
     def get_config(self) -> dict:
         """Return the config dictionary for recreating this class."""
