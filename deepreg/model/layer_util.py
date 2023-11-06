@@ -77,7 +77,7 @@ def get_n_bits_combinations(num_bits: int) -> List[List[int]]:
 
 
 def pyramid_combination(
-    values: list, weight_floor: list, weight_ceil: list
+    values: list, weight_floor: list, weight_ceil: list, interpolation: str = "linear"
 ) -> tf.Tensor:
     r"""
     Calculates linear interpolation (a weighted sum) using values of
@@ -203,14 +203,22 @@ def pyramid_combination(
         values=values[::2],
         weight_floor=weight_floor[:-1],
         weight_ceil=weight_ceil[:-1],
+        interpolation=interpolation
     )
-    values_floor = values_floor * weight_floor[-1]
+    if interpolation == "nearest":
+        values_floor = tf.where(weight_floor[-1] > weight_ceil[-1], values_floor, 0)
+    else:
+        values_floor = values_floor * weight_floor[-1]
     values_ceil = pyramid_combination(
         values=values[1::2],
         weight_floor=weight_floor[:-1],
         weight_ceil=weight_ceil[:-1],
+        interpolation=interpolation
     )
-    values_ceil = values_ceil * weight_ceil[-1]
+    if interpolation == "nearest":
+        values_ceil = tf.where(weight_floor[-1] > weight_ceil[-1], 0, values_ceil)
+    else:
+        values_ceil = values_ceil * weight_ceil[-1]
     return values_floor + values_ceil
 
 
@@ -298,7 +306,7 @@ def resample(
     # each tensor is the weight for the corner of floor coordinates
     # each tensor's shape is (batch, *loc_shape) if volume has no feature channel
     #                        (batch, *loc_shape, 1) if volume has feature channel
-    loc_floor_ceil, loc_nn, weight_floor, weight_ceil = [], [], [], []
+    loc_floor_ceil, weight_floor, weight_ceil = [], [], []
     # using for loop is faster than using list comprehension
     for dim in range(dim_vol):
         # shape = (batch, *loc_shape)
@@ -314,10 +322,6 @@ def resample(
         loc_floor_ceil.append([tf.cast(c_floor, tf.int32), tf.cast(c_ceil, tf.int32)])
         weight_floor.append(w_floor)
         weight_ceil.append(w_ceil)
-
-        if interpolation == "nearest":
-            # shape = (batch, *loc_shape)
-            loc_nn.append(tf.where(w_floor > w_ceil, c_floor, c_ceil))
 
     # 2**n corners, each is a list of n binary values
     corner_indices = get_n_bits_combinations(num_bits=len(vol_shape))
@@ -356,14 +360,9 @@ def resample(
     ]  # each tensor has shape (batch, *loc_shape) or (batch, *loc_shape, ch)
 
 
-
-    if interpolation == "nearest":
-        # shape = (batch, *loc_shape)
-        sampled = tf.stack(loc_nn, axis=-1)
-    else: # linear
-        sampled = pyramid_combination(
-            values=corner_values, weight_floor=weight_floor, weight_ceil=weight_ceil
-        )
+    sampled = pyramid_combination(
+        values=corner_values, weight_floor=weight_floor, weight_ceil=weight_ceil, interpolation=interpolation
+    )
     return sampled
 
 
