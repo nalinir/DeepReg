@@ -57,6 +57,18 @@ def gradient_dxyz(fxyz: tf.Tensor, fn: Callable) -> tf.Tensor:
     """
     return tf.stack([fn(fxyz[..., i]) for i in [0, 1, 2]], axis=4)
 
+def stable_f(x, min_value=1e-6):
+    """
+    Perform the operation f(x) = x + 1/x in a numerically stable way.
+
+    This function is intended to penalize growing and shrinking equally.
+
+    :param x: Input tensor.
+    :param min_value: The minimum value to which x will be clamped.
+    :return: The result of the operation.
+    """
+    x_clamped = tf.clip_by_value(x, min_value, tf.float32.max)
+    return x_clamped + 1.0 / x_clamped
 
 @REGISTRY.register_loss(name="gradient")
 class GradientNorm(tf.keras.layers.Layer):
@@ -196,3 +208,55 @@ class BendingEnergy(tf.keras.layers.Layer):
         energy = dfdxx ** 2 + dfdyy ** 2 + dfdzz ** 2
         energy += 2 * dfdxy ** 2 + 2 * dfdxz ** 2 + 2 * dfdyz ** 2
         return tf.reduce_mean(energy, axis=[1, 2, 3, 4])
+
+@REGISTRY.register_loss(name="nonrigid")
+class NonRigidPenalty(tf.keras.layers.Layer):
+    """
+    Calculate the L1/L2 norm of ddf using central finite difference.
+
+    Take difference between the norm and the norm of a reference grid to penalize any non-rigid transformation.
+
+    y_true and y_pred have to be at least 5d tensor, including batch axis.
+    """
+
+    def __init__(self, img_size, l1: bool = False, name: str = "NonRigidPenalty", **kwargs):
+        """
+        Init.
+
+        :param img_size: size of the 3d images, for initializing reference grid
+        :param l1: bool true if calculate L1 norm, otherwise L2 norm
+        :param name: name of the loss
+        :param kwargs: additional arguments.
+        """
+        super().__init__(name=name)
+        self.l1 = l1
+        self.img_size = img_size
+        grid_ref = tf.expand_dims(layer_util.get_reference_grid(grid_size=img_size), axis=0)
+        self.ddf_ref = -grid_ref
+
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
+        """
+        Return a scalar loss.
+
+        :param inputs: shape = (batch, m_dim1, m_dim2, m_dim3, 3)
+        :param kwargs: additional arguments.
+        :return: shape = (batch, )
+        """
+        assert len(inputs.shape) == 5
+        ddf = inputs
+        # first order gradient
+        # (batch, m_dim1-2, m_dim2-2, m_dim3-2, 3)
+        dfdx = gradient_dxyz(ddf - self.ddf_ref, gradient_dx)
+        dfdy = gradient_dxyz(ddf - self.ddf_ref, gradient_dy)
+        dfdz = gradient_dxyz(ddf - self.ddf_ref, gradient_dz)
+        if self.l1:
+            norms = tf.abs(stable_f(tf.abs(dfdx) + tf.abs(dfdy) + tf.abs(dfdz)) - 2.0)
+        else:
+            norms = tf.abs(stable_f(dfdx ** 2 + dfdy ** 2 + dfdz ** 2) - 2.0)
+        return tf.reduce_mean(norms, axis=[1, 2, 3, 4])
+
+    def get_config(self) -> dict:
+        """Return the config dictionary for recreating this class."""
+        config = super().get_config()
+        config["l1"] = self.l1
+        return config
