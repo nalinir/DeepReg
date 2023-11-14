@@ -1,5 +1,5 @@
 """Provide regularization functions and classes for ddf."""
-from typing import Callable
+from typing import Callable, Tuple
 
 import tensorflow as tf
 
@@ -219,7 +219,7 @@ class NonRigidPenalty(tf.keras.layers.Layer):
     y_true and y_pred have to be at least 5d tensor, including batch axis.
     """
 
-    def __init__(self, img_size, l1: bool = False, name: str = "NonRigidPenalty", **kwargs):
+    def __init__(self, img_size: Tuple[int, int, int] = (0, 0, 0), l1: bool = False, name: str = "NonRigidPenalty", **kwargs):
         """
         Init.
 
@@ -230,8 +230,12 @@ class NonRigidPenalty(tf.keras.layers.Layer):
         """
         super().__init__(name=name)
         self.l1 = l1
+
+        # Assert that img_size has been changed from the default value
+        assert img_size != (0, 0, 0), "img_size must be set to a value other than (0, 0, 0)"
+
         self.img_size = img_size
-        grid_ref = tf.expand_dims(layer_util.get_reference_grid(grid_size=img_size), axis=0)
+        grid_ref = tf.expand_dims(layer_util.get_reference_grid(grid_size=self.img_size), axis=0)
         self.ddf_ref = -grid_ref
 
     def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
