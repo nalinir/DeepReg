@@ -311,7 +311,7 @@ def predict(
     # close the opened files in data loaders
     data_loader.close()
 
-def normalize_batched_image(batched_image; eps=1e-7):
+def normalize_batched_image(batched_image, eps=1e-7):
     """
     Normalizes each image in a batch to [0, 1] range separately.
     """
