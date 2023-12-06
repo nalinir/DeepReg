@@ -311,7 +311,7 @@ def predict(
     # close the opened files in data loaders
     data_loader.close()
 
-def normalize_batched_image(batched_image):
+def normalize_batched_image(batched_image; eps=1e-7):
     """
     Normalizes each image in a batch to [0, 1] range separately.
     """
@@ -321,7 +321,7 @@ def normalize_batched_image(batched_image):
 
     # Normalize each image separately
     batched_image = batched_image - min_vals
-    batched_image = batched_image / (max_vals - min_vals)
+    batched_image = batched_image / tf.maximum(max_vals - min_vals, eps)
     return batched_image
 
 
