@@ -311,6 +311,75 @@ def predict(
     # close the opened files in data loaders
     data_loader.close()
 
+def normalize_batched_image(batched_image):
+    """
+    Normalizes each image in a batch to [0, 1] range separately.
+    """
+    # Calculate the min and max values for each image in the batch
+    min_vals = tf.math.reduce_min(batched_image, axis=[1, 2, 3], keepdims=True)
+    max_vals = tf.math.reduce_max(batched_image, axis=[1, 2, 3], keepdims=True)
+
+    # Normalize each image separately
+    batched_image = batched_image - min_vals
+    batched_image = batched_image / (max_vals - min_vals)
+    return batched_image
+
+
+def unwrapped_predict(batched_fixed_img, batched_moving_img, output_dir, model=None, model_ckpt_path=None, model_config_path=None):
+    """
+    Function to predict some metrics from the saved model and logging results.
+    """
+    batch_size = batched_fixed_img.shape[0]
+    moving_image_shape = batched_moving_img.shape[1:]
+    fixed_image_shape = batched_fixed_img.shape[1:]
+
+    # load model if not provided
+    if model is None:
+        assert model_ckpt_path is not None, "model_ckpt_path must be provided if model is None"
+        assert model_config_path is not None, "model_config_path must be provided if model is None"
+        config, log_dir, ckpt_path = build_config(
+            config_path=model_config_path, log_dir=output_dir, exp_name=output_dir, ckpt_path=model_ckpt_path
+        )
+        num_devices = max(len(tf.config.list_physical_devices("GPU")), 1)
+        if num_devices > 1:  # pragma: no cover
+            strategy = tf.distribute.MirroredStrategy()
+            if batch_size % num_devices != 0:
+                raise ValueError(
+                    f"batch size {batch_size} can not be divided evenly "
+                    f"by the number of devices."
+                )
+        else:
+            strategy = tf.distribute.get_strategy()
+        with strategy.scope():
+            model: tf.keras.Model = REGISTRY.build_model(
+                config=dict(
+                    name=config["train"]["method"],
+                    moving_image_size=moving_image_shape,
+                    fixed_image_size=fixed_image_shape,
+                    index_size=0,
+                    labeled=config["dataset"]["test"]["labeled"],
+                    batch_size=batch_size,
+                    config=config["train"]
+                )
+            )
+            optimizer = opt.build_optimizer(optimizer_config=config["train"]["optimizer"])
+            model.compile(optimizer=optimizer)
+
+        # load weights
+        model.load_weights(model_ckpt_path)
+    
+    # predict
+    inputs = {}
+    inputs["fixed_image"] = normalize_batched_image(tf.convert_to_tensor(batched_fixed_img))
+    inputs["moving_image"] = normalize_batched_image(tf.convert_to_tensor(batched_moving_img))
+    inputs["indices"] = tf.convert_to_tensor(np.array([]))
+
+    outputs = model(inputs, training=False)
+
+    return outputs, model
+
+
+
 
 def main(args=None):
     """
