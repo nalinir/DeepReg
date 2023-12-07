@@ -356,7 +356,7 @@ def unwrapped_predict(batched_fixed_img, batched_moving_img, output_dir, model=N
                     name=config["train"]["method"],
                     moving_image_size=moving_image_shape,
                     fixed_image_size=fixed_image_shape,
-                    index_size=0,
+                    index_size=2,
                     labeled=config["dataset"]["test"]["labeled"],
                     batch_size=batch_size,
                     config=config["train"]
@@ -388,6 +388,7 @@ def unwrapped_predict(batched_fixed_img, batched_moving_img, output_dir, model=N
                 log_dir=output_dir,
                 save_period=config["train"]["save_period"],
                 ckpt_path=model_ckpt_path,
+                skip_training_initialization=True
             )
     
     # predict
