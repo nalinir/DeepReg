@@ -66,6 +66,7 @@ def build_checkpoint_callback(
     log_dir: str,
     save_period: int,
     ckpt_path: str,
+    skip_training_initialization: bool = False
 ) -> Tuple[CheckpointManagerCallback, int]:
     """
     Function to prepare callbacks for training.
@@ -78,12 +79,13 @@ def build_checkpoint_callback(
     :return: a list of callbacks
     """
     # fit the model for 1 step to initialise optimiser arguments as trackable Variables
-    model.fit(
-        x=dataset,
-        steps_per_epoch=1,
-        epochs=1,
-        verbose=0,
-    )
+    if not skip_training_initialization:
+        model.fit(
+            x=dataset,
+            steps_per_epoch=1,
+            epochs=1,
+            verbose=0,
+        )
     checkpoint_manager_callback = CheckpointManagerCallback(
         model, log_dir + "/save", period=save_period
     )
