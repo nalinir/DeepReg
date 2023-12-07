@@ -366,7 +366,29 @@ def unwrapped_predict(batched_fixed_img, batched_moving_img, output_dir, model=N
             model.compile(optimizer=optimizer)
 
         # load weights
-        model.load_weights(model_ckpt_path)
+        data_loader, dataset, _ = build_dataset(
+            dataset_config=config["dataset"],
+            preprocess_config=config["train"]["preprocess"],
+            split="test",
+            training=False,
+            repeat=False,
+        )
+        assert data_loader is not None
+
+        if model_ckpt_path.endswith(".ckpt"):
+            # for ckpt from tf.keras.callbacks.ModelCheckpoint
+            # skip warnings because of optimizers
+            # https://stackoverflow.com/questions/58289342/tf2-0-translation-model-error-when-restoring-the-saved-model-unresolved-object
+            model.load_weights(model_ckpt_path).expect_partial()  # pragma: no cover
+        else:
+            # for ckpts from ckpt manager callback
+            _, _ = build_checkpoint_callback(
+                model=model,
+                dataset=dataset,
+                log_dir=output_dir,
+                save_period=config["train"]["save_period"],
+                ckpt_path=model_ckpt_path,
+            )
     
     # predict
     inputs = {}
