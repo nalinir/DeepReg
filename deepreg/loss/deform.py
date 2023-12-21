@@ -161,6 +161,52 @@ class DifferenceNorm(tf.keras.layers.Layer):
         else:
             norms = ddf ** 2
         return tf.reduce_mean(norms, axis=[1, 2, 3, 4])
+
+@REGISTRY.register_loss(name="axisdiff")
+class AxisDifferenceNorm(tf.keras.layers.Layer):
+    """
+    Calculate the average displacement of a pixel in the image, using taxicab metric.
+
+    y_true and y_pred have to be at least 5d tensor, including batch axis.
+    """
+
+    def __init__(self, l1: bool = False, axis: int = 2, name: str = "DifferenceNorm", **kwargs):
+        """
+        Init.
+
+        :param l1: bool true if calculate L1 norm, otherwise L2 norm
+        :param name: name of the loss
+        :param kwargs: additional arguments.
+        """
+        super().__init__(name=name)
+        self.axis = axis
+        self.l1 = l1
+
+
+    def get_config(self) -> dict:
+        """Return the config dictionary for recreating this class."""
+        config = super().get_config()
+        config["l1"] = self.l1
+        return config
+
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
+        """
+        Return a scalar loss.
+
+        :param inputs: shape = (batch, m_dim1, m_dim2, m_dim3, 3)
+        :param kwargs: additional arguments.
+        :return: shape = (batch, )
+        """
+        assert len(inputs.shape) == 5
+        ddf = inputs
+        axis = self.axis
+        # first order gradient
+        # (batch, m_dim1-2, m_dim2-2, m_dim3-2, 3)
+        if self.l1:
+            norms = tf.abs(ddf[:,:,:,:,axis:(axis+1)])
+        else:
+            norms = ddf[:,:,:,:,axis:(axis+1)] ** 2
+        return tf.reduce_mean(norms, axis=[1, 2, 3, 4])
     
 
 @REGISTRY.register_loss(name="bending")
