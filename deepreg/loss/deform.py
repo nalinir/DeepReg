@@ -311,3 +311,78 @@ class NonRigidPenalty(tf.keras.layers.Layer):
         config = super().get_config()
         config["l1"] = self.l1
         return config
+
+
+@REGISTRY.register_loss(name="hybrid")
+class HybridNorm(tf.keras.layers.Layer):
+
+    def __init__(self,
+        weight: dict = {"nonrigid": 0.02,
+                        "gradient": 0.02,
+                        "axisdiff": 0.001},
+        l1: bool = False,
+        axis: int = 2,
+        name: str = "HybridNorm",
+        img_size: Tuple[int, int, int] = (0, 0, 0),
+        **kwargs):
+
+        """
+        Init.
+
+        :param l1: bool true if calculate L1 norm, otherwise L2 norm
+        :param name: name of the loss
+        :param kwargs: additional arguments.
+        """
+        super().__init__(name=name)
+        self.axis = axis
+        self.l1 = l1
+        self.nonrigid_weight = weight["nonrigid"]
+        self.gradientNorm_weight = weight["gradient"]
+        self.axisdiffNorm_weight = weight["axisdiff"]
+        self.img_size = img_size
+        grid_ref = tf.expand_dims(layer_util.get_reference_grid(grid_size=self.img_size), axis=0)
+        self.ddf_ref = -grid_ref
+
+        assert img_size != (0, 0, 0), "img_size must be set to a value other than (0, 0, 0)"
+
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
+
+        assert len(inputs.shape) == 5
+        ddf = inputs
+        # compute the nonrigid penalty
+        dfdx_nonrigid = gradient_dxyz(ddf - self.ddf_ref, gradient_dx)
+        dfdy_nonrigid = gradient_dxyz(ddf - self.ddf_ref, gradient_dy)
+        dfdz_nonrigid = gradient_dxyz(ddf - self.ddf_ref, gradient_dz)
+
+        if self.l1:
+            nonrigid_norms = tf.abs(
+                    stable_f(tf.abs(dfdx_nonrigid) + \
+                        tf.abs(dfdy_nonrigid) + tf.abs(dfdz_nonrigid)) - 2.0)
+        else:
+            nonrigid_norms = tf.abs(stable_f(dfdx_nonrigid ** 2 + \
+                dfdy_nonrigid ** 2 + dfdz_nonrigid ** 2) - 2.0)
+
+        # compute the graident norm
+        dfdx = gradient_dxyz(ddf, gradient_dx)
+        dfdy = gradient_dxyz(ddf, gradient_dy)
+        dfdz = gradient_dxyz(ddf, gradient_dz)
+        if self.l1:
+            gradient_norms = tf.abs(dfdx) + tf.abs(dfdy) + tf.abs(dfdz)
+        else:
+            gradient_norms = dfdx ** 2 + dfdy ** 2 + dfdz ** 2
+
+        # compute the axis difference norm
+        if self.l1:
+            axisdiff_norms = tf.abs(ddf[:,:,:,:,self.axis:(self.axis+1)])
+        else:
+            axisdiff_norms = ddf[:,:,:,:,self.axis:(self.axis+1)] ** 2
+
+        return self.nonrigid_weight * tf.reduce_mean(
+                      nonrigid_norms,
+                      axis=[1, 2, 3, 4]) + \
+               self.gradientNorm_weight * tf.reduce_mean(
+                      gradient_norms,
+                      axis=[1, 2, 3, 4]) + \
+               self.axisdiffNorm_weight * tf.reduce_mean(
+                      axisdiff_norms,
+                      axis=[1, 2, 3, 4])
