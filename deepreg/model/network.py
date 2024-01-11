@@ -173,6 +173,7 @@ class RegistrationModel(tf.keras.Model):
         images = tf.concat(images, axis=4)
         return images
 
+    # TODO: add the hybrid option
     def _build_loss(self, name: str, inputs_dict: dict):
         """
         Build and add one weighted loss together with the metrics.
@@ -219,7 +220,17 @@ class RegistrationModel(tf.keras.Model):
                 default_args={"reduction": tf.keras.losses.Reduction.NONE},
             )
             loss_value = loss_layer(**inputs_dict)
-            weighted_loss = loss_value * weight
+
+            ### TODO: changed how loss is weighted
+            if name == "regularization":
+                hybrid = loss_config["hybrid"]
+                if hybrid:
+                    weighted_loss = loss_value
+                else:
+                    weighted_loss = loss_value * weight
+            # alternative case: weighted image loss
+            else:
+                weighted_loss = loss_value * weight
 
             # add loss
             self._model.add_loss(weighted_loss)
@@ -428,6 +439,7 @@ class DDFModel(RegistrationModel):
 
         # ddf loss and metrics
         ddf = self._outputs["ddf"]
+        ### TODO: call build hybrid loss
         self._build_loss(name="regularization", inputs_dict=dict(inputs=ddf))
         self.log_tensor_stats(tensor=ddf, name="ddf")
 
