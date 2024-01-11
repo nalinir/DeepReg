@@ -176,6 +176,8 @@ class MultiClassDiceScore(tf.keras.losses.Loss):
 
     where num and denom are summed over all axes except the batch axis.
 
+    This score is implemented separately for each class, then averaged.
+
     Reference:
         Sudre, Carole H., et al. "Generalised dice overlap as a deep learning loss
         function for highly unbalanced segmentations." Deep learning in medical image
@@ -197,6 +199,7 @@ class MultiClassDiceScore(tf.keras.losses.Loss):
         Init.
 
         :param binary: if True, project y_true, y_pred to 0 or 1.
+        :param use_non_default_background_weight: whether to weigh background differently than foreground.
         :param background_weight: weight for background, where y == 0.
         :param smooth_nr: small constant added to numerator in case of zero covariance.
         :param smooth_dr: small constant added to denominator in case of zero variance.
