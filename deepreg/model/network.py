@@ -413,6 +413,8 @@ class DDFModel(RegistrationModel):
         if not self.labeled:
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
+        warping = layer.Warping(fixed_image_size=self.fixed_image_size, interpolation="nearest")
+
         # (f_dim1, f_dim2, f_dim3)
         moving_label = self._inputs["moving_label"]
         pred_fixed_label = warping(inputs=[ddf, moving_label])
