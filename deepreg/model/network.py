@@ -121,12 +121,14 @@ class RegistrationModel(tf.keras.Model):
             shape=self.moving_image_size,
             batch_size=self.batch_size,
             name="moving_label",
+            dtype=tf.int32
         )
         # (batch, m_dim1, m_dim2, m_dim3)
         fixed_label = tf.keras.Input(
             shape=self.fixed_image_size,
             batch_size=self.batch_size,
             name="fixed_label",
+            dtype=tf.int32
         )
         return dict(
             moving_image=moving_image,
@@ -344,7 +346,8 @@ class RegistrationModel(tf.keras.Model):
         :param tensor: tensor to monitor.
         :param name: name of the tensor.
         """
-        flatten = tf.reshape(tensor, shape=(self.batch_size, -1))
+        flatten = tf.cast(tf.reshape(tensor, shape=(self.batch_size, -1)),
+                tf.float32)
         self._model.add_metric(
             tf.reduce_mean(flatten, axis=1),
             name=f"metric/{name}_mean",
@@ -424,12 +427,12 @@ class DDFModel(RegistrationModel):
         if not self.labeled:
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
-        warping = layer.Warping(fixed_image_size=self.fixed_image_size, interpolation="nearest")
-
+        # warping_2 = layer.Warping(fixed_image_size=self.fixed_image_size, interpolation="nearest")
         # (f_dim1, f_dim2, f_dim3)
         moving_label = self._inputs["moving_label"]
+        print(moving_label.dtype)
         pred_fixed_label = warping(inputs=[ddf, moving_label])
-
+        print(pred_fixed_label.dtype)
         self._outputs["pred_fixed_label"] = pred_fixed_label
         return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 

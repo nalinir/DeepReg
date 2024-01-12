@@ -158,6 +158,28 @@ class DiceLoss(NegativeLossMixin, MultiScaleMixin, DiceScore):
     """Revert the sign of DiceScore and support multi-scaling options."""
 
 
+class DiceScoreLayer(tf.keras.layers.Layer):
+    def __init__(self, smooth_nr=1e-6, smooth_dr=1e-6, **kwargs):
+        super().__init__(**kwargs)
+        self.smooth_nr = smooth_nr
+        self.smooth_dr = smooth_dr
+
+    def call(self, inputs):
+        y_true_class, y_pred_class = inputs
+        intersection = tf.reduce_sum(y_true_class * y_pred_class, axis=[1, 2, 3])
+        union = tf.reduce_sum(y_true_class, axis=[1, 2, 3]) + tf.reduce_sum(y_pred_class, axis=[1, 2, 3])
+        dice = (2. * intersection + self.smooth_nr) / (union + self.smooth_dr)
+
+        def blank_fn():
+            return tf.fill(tf.shape(intersection), -1.0)
+
+        def real_fn():
+            return (2. * intersection + self.smooth_nr) / (union + self.smooth_dr)
+
+        # if union is empty, return -1
+        return tf.cond(tf.reduce_all(tf.less(union, 1)), blank_fn, real_fn)
+
+
 class MultiClassDiceScore(tf.keras.losses.Loss):
     """
     Define dice score.
@@ -192,6 +214,7 @@ class MultiClassDiceScore(tf.keras.losses.Loss):
         background_weight: float = 0.0,
         smooth_nr: float = EPS,
         smooth_dr: float = EPS,
+        max_num_classes: int = 200,
         name: str = "DiceScore",
         **kwargs,
     ):
@@ -218,23 +241,9 @@ class MultiClassDiceScore(tf.keras.losses.Loss):
         self.background_weight = background_weight
         self.smooth_nr = smooth_nr
         self.smooth_dr = smooth_dr
+        self.max_num_classes = max_num_classes
         self.flatten = tf.keras.layers.Flatten()
 
-    def dice_score_per_class(self, y_true_class, y_pred_class):
-        """
-        Compute the Dice Score for a single class.
-
-        :param y_true_class: Tensor of ground truth for a class
-        :param y_pred_class: Tensor of predictions for a class
-        :param smooth: Small constant to avoid division by zero
-        :return: Dice Score for the class
-        """
-        intersection = tf.reduce_sum(y_true_class * y_pred_class, axis=[1, 2, 3])
-        union = tf.reduce_sum(y_true_class, axis=[1, 2, 3]) + tf.reduce_sum(y_pred_class, axis=[1, 2, 3])
-
-        dice = (2. * intersection + self.smooth_nr) / (union + self.smooth_dr)
-        return dice
-    
     def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         """
         Return loss for a batch.
@@ -247,28 +256,45 @@ class MultiClassDiceScore(tf.keras.losses.Loss):
             y_true = tf.cast(y_true >= 0.5, dtype=y_true.dtype)
             y_pred = tf.cast(y_pred >= 0.5, dtype=y_pred.dtype)
 
-        num_classes = tf.reduce_max(y_true) + 1
+        num_classes = self.max_num_classes
 
-        unique_classes = tf.unique(tf.reshape(y_true, [-1]))[0]
+        class_indices = tf.range(num_classes)
 
         y_true_one_hot = tf.one_hot(y_true, depth=num_classes, axis=-1)
         y_pred_one_hot = tf.one_hot(y_pred, depth=num_classes, axis=-1)
+
+        dice_layer = DiceScoreLayer(smooth_nr=self.smooth_nr,
+                smooth_dr=self.smooth_dr)
 
         # Function to compute Dice Score for each class
         def compute_dice_for_class(class_index):
             y_true_class = y_true_one_hot[..., class_index]
             y_pred_class = y_pred_one_hot[..., class_index]
-            return self.dice_score_per_class(y_true_class, y_pred_class)
+            return dice_layer((y_true_class, y_pred_class))
 
-        scores = tf.map_fn(compute_dice_for_class, unique_classes, dtype=tf.float32)
+        scores = [compute_dice_for_class(cls) for cls in class_indices]
+
+        scores = tf.stack(scores, axis=-1)
+
+        mask = scores >= 0
+
+        # filter out negative entries corresponding to blank slices
+        scores = tf.where(mask, scores, tf.zeros_like(scores))
+
+        scores_sum = tf.reduce_sum(scores, axis=-1)
+        num_positive_scores = tf.reduce_sum(tf.cast(mask, tf.float32), axis=-1)
+        mean_scores = scores_sum / (num_positive_scores + tf.keras.backend.epsilon())
 
         if not self.use_non_default_background_weight:
             return tf.reduce_mean(scores, axis=-1)
         
+        assert mask[0] > 0, "Background must be present."
         background_scores = scores[..., 0]
         foreground_scores = scores[..., 1:]
         weighted_background_score = tf.reduce_mean(background_scores) * self.background_weight
-        weighted_foreground_score = tf.reduce_mean(foreground_scores) * (1 - self.background_weight)
+        weighted_foreground_score = tf.reduce_mean(foreground_scores) * (1 -
+                self.background_weight) / (num_positive_scores - 1 +
+                        tf.keras.backend.epsilon())
         total_score = weighted_background_score + weighted_foreground_score
         return total_score / (self.background_weight + (1 - self.background_weight) * (num_classes - 1))
 
@@ -471,6 +497,7 @@ def compute_centroid(mask: tf.Tensor, grid: tf.Tensor) -> tf.Tensor:
     :return: shape = (batch, 3), batch of vectors denoting
              location of centroids.
     """
+    mask = tf.cast(mask, dtype=tf.float32)
     assert len(mask.shape) == 4
     assert len(grid.shape) == 5
     bool_mask = tf.expand_dims(
@@ -503,6 +530,7 @@ def foreground_proportion(y: tf.Tensor) -> tf.Tensor:
     :param y: shape = (batch, dim1, dim2, dim3), a 3D label tensor
     :return: shape = (batch,)
     """
+    y = tf.cast(y, dtype=tf.float32)
     y = tf.cast(y >= 0.5, dtype=tf.float32)
     return tf.reduce_sum(y, axis=[1, 2, 3]) / tf.reduce_sum(
         tf.ones_like(y), axis=[1, 2, 3]

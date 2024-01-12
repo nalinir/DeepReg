@@ -208,7 +208,8 @@ def pyramid_combination(
         interpolation=interpolation
     )
     if interpolation == "nearest":
-        values_floor = tf.where(weight_floor[-1] > weight_ceil[-1], values_floor, 0)
+        values_floor = tf.where(weight_floor[-1] > weight_ceil[-1],
+                values_floor, tf.cast(0, values_floor.dtype))
     else:
         values_floor = values_floor * weight_floor[-1]
     values_ceil = pyramid_combination(
@@ -218,7 +219,8 @@ def pyramid_combination(
         interpolation=interpolation
     )
     if interpolation == "nearest":
-        values_ceil = tf.where(weight_floor[-1] > weight_ceil[-1], 0, values_ceil)
+        values_ceil = tf.where(weight_floor[-1] > weight_ceil[-1], tf.cast(0,
+            values_ceil.dtype), values_ceil)
     else:
         values_ceil = values_ceil * weight_ceil[-1]
     return values_floor + values_ceil

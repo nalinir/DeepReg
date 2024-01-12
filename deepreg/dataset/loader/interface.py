@@ -369,7 +369,10 @@ class GeneratorDataLoader(DataLoader, ABC):
         ):
             if arr is None:
                 continue
-            if np.min(arr) < 0 or np.max(arr) > 1:
+            # Disable this check due to MultiClassDiceScore
+            # TODO: Check performance of MultiClassDiceScore vs DiceScore with
+            # one-hot encoding.
+            if (np.min(arr) < 0 or np.max(arr) > 1) and False:
                 raise ValueError(
                     f"Sample {image_indices}'s {name}'s values are not between [0, 1]. "
                     f"Its minimum value is {np.min(arr)} "
