@@ -278,12 +278,13 @@ class RegistrationModel(tf.keras.Model):
                 name="label",
                 inputs_dict=dict(y_true=fixed_label, y_pred=pred_fixed_label),
             )
-
+            # TODO: Fix this metric with the weird partially-one-hot labeling
+            # scheme
             # additional label metrics
-            tre = compute_centroid_distance(
-                y_true=fixed_label, y_pred=pred_fixed_label, grid=self.grid_ref
-            )
-            self._model.add_metric(tre, name="metric/TRE", aggregation="mean")
+            # tre = compute_centroid_distance(
+            #    y_true=fixed_label, y_pred=pred_fixed_label, grid=self.grid_ref
+            # )
+            # self._model.add_metric(tre, name="metric/TRE", aggregation="mean")
 
     def call(
         self, inputs: Dict[str, tf.Tensor], training=None, mask=None
@@ -430,8 +431,15 @@ class DDFModel(RegistrationModel):
         # warping_2 = layer.Warping(fixed_image_size=self.fixed_image_size, interpolation="nearest")
         # (f_dim1, f_dim2, f_dim3)
         moving_label = self._inputs["moving_label"]
+        # TODO: Put 200 in an initialization argument
+        moving_label_one_hot = tf.one_hot(moving_label, depth=200, axis=-1)
+        print("Moving label data type")
         print(moving_label.dtype)
-        pred_fixed_label = warping(inputs=[ddf, moving_label])
+        print("One-hot moving label data type and shape")
+        print(moving_label_one_hot.dtype)
+        print(moving_label_one_hot.shape)
+        pred_fixed_label = warping(inputs=[ddf, moving_label_one_hot])
+        print("Fixed label data type")
         print(pred_fixed_label.dtype)
         self._outputs["pred_fixed_label"] = pred_fixed_label
         return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)

@@ -260,8 +260,10 @@ class MultiClassDiceScore(tf.keras.losses.Loss):
 
         class_indices = tf.range(num_classes)
 
+        # y_true starts in integer encoding
         y_true_one_hot = tf.one_hot(y_true, depth=num_classes, axis=-1)
-        y_pred_one_hot = tf.one_hot(y_pred, depth=num_classes, axis=-1)
+        # y_pred should already be in one-hot encoding due to the warping
+        y_pred_one_hot = y_pred# tf.one_hot(y_pred, depth=num_classes, axis=-1)
 
         dice_layer = DiceScoreLayer(smooth_nr=self.smooth_nr,
                 smooth_dr=self.smooth_dr)
