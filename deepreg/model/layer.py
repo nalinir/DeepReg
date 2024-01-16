@@ -269,6 +269,36 @@ class Warping(tfkl.Layer):
         return config
 
 
+class MultiChannelWarping(tfkl.Layer):
+    def __init__(self, fixed_image_size: tuple, name: str = "multi_channel_warping", 
+                 interpolation: str = "linear", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self._fixed_image_size = fixed_image_size
+        self.grid_ref = layer_util.get_reference_grid(grid_size=fixed_image_size)[None, ...]
+        self.interpolation = interpolation
+        self.warping_layer = Warping(fixed_image_size, interpolation=interpolation)
+
+    def call(self, inputs, **kwargs) -> tf.Tensor:
+        ddf, image = inputs
+
+        # Transpose image to bring channels to the front: (batch, channels, x, y, z)
+        image_transposed = tf.transpose(image, perm=[4, 0, 1, 2, 3])
+
+        # Apply warping using map_fn
+        def warp_channel(image_slice):
+            # image_slice shape is (batch, x, y, z) after slicing
+            return self.warping_layer([ddf, image_slice])
+
+        warped_image = tf.map_fn(warp_channel, image_transposed, dtype=tf.float32)
+
+        # Transpose back to original shape: (batch, x, y, z, channels)
+        return tf.transpose(warped_image, perm=[1, 2, 3, 4, 0])
+
+    def get_config(self) -> dict:
+        config = super().get_config()
+        config["fixed_image_size"] = self._fixed_image_size
+        return config
+
 class ResidualBlock(tfkl.Layer):
     """
     A block with skip links and layer - norm - activation.

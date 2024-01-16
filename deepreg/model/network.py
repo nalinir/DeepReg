@@ -428,19 +428,19 @@ class DDFModel(RegistrationModel):
         if not self.labeled:
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
-        # warping_2 = layer.Warping(fixed_image_size=self.fixed_image_size, interpolation="nearest")
+        warping_multichannel = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size)
         # (f_dim1, f_dim2, f_dim3)
         moving_label = self._inputs["moving_label"]
         # TODO: Put 200 in an initialization argument
-        moving_label_one_hot = tf.one_hot(moving_label, depth=200, axis=-1)
-        print("Moving label data type")
-        print(moving_label.dtype)
-        print("One-hot moving label data type and shape")
-        print(moving_label_one_hot.dtype)
-        print(moving_label_one_hot.shape)
-        pred_fixed_label = warping(inputs=[ddf, moving_label_one_hot])
-        print("Fixed label data type")
-        print(pred_fixed_label.dtype)
+        moving_label_one_hot = tf.one_hot(moving_label, depth=50, axis=-1)
+        # print("Moving label data type")
+        # print(moving_label.dtype)
+        # print("One-hot moving label data type and shape")
+        # print(moving_label_one_hot.dtype)
+        # print(moving_label_one_hot.shape)
+        pred_fixed_label = warping_multichannel(inputs=[ddf, moving_label_one_hot])
+        # print("Fixed label data type")
+        # print(pred_fixed_label.dtype)
         self._outputs["pred_fixed_label"] = pred_fixed_label
         return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 

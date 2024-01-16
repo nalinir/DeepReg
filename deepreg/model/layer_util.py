@@ -337,7 +337,7 @@ def resample(
     if batch_size == None:
         # TODO: need to reset batch size here everytime changing training
         # setting
-        batch_size = 1
+        batch_size = 1 
         print(f"Found batch size None so set batch size to {batch_size}")
 
     # batch_coords[b, l1, ..., lm] = b

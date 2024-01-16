@@ -214,7 +214,7 @@ class MultiClassDiceScore(tf.keras.losses.Loss):
         background_weight: float = 0.0,
         smooth_nr: float = EPS,
         smooth_dr: float = EPS,
-        max_num_classes: int = 200,
+        max_num_classes: int = 50,
         name: str = "DiceScore",
         **kwargs,
     ):
