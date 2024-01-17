@@ -428,20 +428,22 @@ class DDFModel(RegistrationModel):
         if not self.labeled:
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
-        warping_multichannel = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size)
+        warping_centrids = layer.CentroidWarping(fixed_image_size=self.fixed_image_size)
+        # warping_multichannel = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size)
         # (f_dim1, f_dim2, f_dim3)
-        moving_label = self._inputs["moving_label"]
+        # TODO: branch whether "moving" label should be moving image or fixed centroids based off of the label loss function, and modify loss function calling appropriately
+        moving_label = self._inputs["moving_label"] # for centroid inputs, this will be the FIXED label
         # TODO: Put 200 in an initialization argument
-        moving_label_one_hot = tf.one_hot(moving_label, depth=50, axis=-1)
+        # moving_label_one_hot = tf.one_hot(moving_label, depth=50, axis=-1)
         # print("Moving label data type")
         # print(moving_label.dtype)
         # print("One-hot moving label data type and shape")
         # print(moving_label_one_hot.dtype)
         # print(moving_label_one_hot.shape)
-        pred_fixed_label = warping_multichannel(inputs=[ddf, moving_label_one_hot])
+        pred_fixed_label = warping_centroids(inputs=[ddf, moving_label])
         # print("Fixed label data type")
         # print(pred_fixed_label.dtype)
-        self._outputs["pred_fixed_label"] = pred_fixed_label
+        self._outputs["pred_fixed_label"] = pred_fixed_label # for centroid inputs, this will be the predicted MOVING label
         return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
     def build_loss(self):

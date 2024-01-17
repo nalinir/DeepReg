@@ -299,6 +299,94 @@ class MultiChannelWarping(tfkl.Layer):
         config["fixed_image_size"] = self._fixed_image_size
         return config
 
+class CentroidWarping(tfkl.Layer):
+    """
+    Warps a matrix of coordinates with DDF.
+
+    Reference:
+
+    https://github.com/adalca/neurite/blob/legacy/neuron/utils.py
+    where vol = image, loc_shift = ddf
+    """
+
+    def __init__(self, fixed_image_size: tuple, name: str = "warping", 
+                 interpolation: str = "linear", **kwargs):
+        """
+        Init.
+
+        :param fixed_image_size: shape = (f_dim1, f_dim2, f_dim3)
+             or (f_dim1, f_dim2, f_dim3, ch) with the last channel for features
+        :param name: name of the layer
+        :param kwargs: additional arguments.
+        """
+        super().__init__(name=name, **kwargs)
+        self._fixed_image_size = fixed_image_size
+        # shape = (1, f_dim1, f_dim2, f_dim3, 3)
+        self.grid_ref = layer_util.get_reference_grid(grid_size=fixed_image_size)[
+            None, ...
+        ]
+        self.interpolation = interpolation
+
+    def call(self, inputs, **kwargs) -> tf.Tensor:
+        """
+        :param inputs: (ddf, coordinates)
+
+          - ddf, shape = (batch, f_dim1, f_dim2, f_dim3, 3)
+          - coords, shape = (batch, n_labels, 3)
+        :param kwargs: additional arguments.
+        :return: shape = (batch, f_dim1, f_dim2, f_dim3)
+        """
+        ddf, coords = inputs
+        loc = self.grid_ref + ddf
+        batched_coords = add_batch_dimension(coords) # (batch, n_labels, 4) where the first coordinate is batch index
+        null_vector = initialize_null_vector(coords) # stores (-1,-1,-1) aka ROI not found
+        return warp_coordinate_batch(loc, batched_coords, null_vector)
+
+    def get_config(self) -> dict:
+        """Return the config dictionary for recreating this class."""
+        config = super().get_config()
+        config["fixed_image_size"] = self._fixed_image_size
+        return config
+
+def add_batch_dimension(coord):
+    batch_indices = tf.range(tf.shape(coord)[0], dtype=tf.int32)
+
+    # Expand dims to match the shape of coord
+    batch_indices = tf.expand_dims(batch_indices, axis=1)
+    
+    # Tile to match the number of indices
+    batch_indices = tf.tile(batch_indices, [1, tf.shape(coord)[1]])
+    
+    # Expand dims to concatenate with coord
+    batch_indices = tf.expand_dims(batch_indices, axis=-1)
+    
+    # Concatenate batch_indices with coord to create the final indices
+    return tf.concat([batch_indices, coord], axis=-1)
+
+def initialize_null_vector(coord):
+    null_vector = tf.zeros_like(coord) - 1
+
+    return add_batch_dimension(null_vector)
+
+def warp_coordinate_batch(loc, coord, null_tensor):
+    # Create a mask for null_tensor in coord
+    mask = tf.math.reduce_all(tf.equal(coord, null_tensor), axis=-1)
+
+    # Expand dims to match the shape of coord
+    mask = tf.expand_dims(mask, axis=-1)
+    
+    # Tile to match the last dimension of coord
+    mask = tf.tile(mask, [1, 1, tf.shape(coord)[-1]])
+
+    # Use tf.gather_nd to replace the loop
+    indices = tf.cast(tf.where(mask, 0, coord), tf.int32)
+    ret_coord = tf.gather_nd(loc, indices)
+
+    # Use tf.where to handle the null_tensor condition
+    ret_coord = tf.where(mask[:,:,1:], tf.cast(coord[:,:,1:], tf.float32), ret_coord)
+
+    return ret_coord
+
 class ResidualBlock(tfkl.Layer):
     """
     A block with skip links and layer - norm - activation.

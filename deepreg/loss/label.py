@@ -318,6 +318,56 @@ class MultiClassDiceScore(tf.keras.losses.Loss):
 class MultiClassDiceLoss(NegativeLossMixin, MultiScaleMixin, MultiClassDiceScore):
     """Revert the sign of DiceScore and support multi-scaling options."""
 
+@REGISTRY.register_loss(name="centroid")
+class CentroidDistScore(tf.keras.losses.Loss):
+    def __init__(
+        self,
+        smooth_nr: float = EPS,
+        smooth_dr: float = EPS,
+        name: str = "DiceScore",
+        **kwargs,
+    ):
+        """
+        Init.
+
+        :param binary: if True, project y_true, y_pred to 0 or 1.
+        :param background_weight: weight for background, where y == 0.
+        :param smooth_nr: small constant added to numerator in case of zero covariance.
+        :param smooth_dr: small constant added to denominator in case of zero variance.
+        :param name: name of the loss.
+        :param kwargs: additional arguments.
+        """
+        super().__init__(name=name, **kwargs)
+        self.smooth_nr = smooth_nr
+        self.smooth_dr = smooth_dr
+        self.flatten = tf.keras.layers.Flatten()
+
+    def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        """
+        Return loss for a batch.
+
+        :param y_true: shape = (batch, ...)
+        :param y_pred: shape = (batch, ...)
+        :return: shape = (batch,)
+        """
+        mask = tf.math.reduce_all(tf.equal(y_true, -1), axis=-1) # values that weren't in the original moving image
+
+        mask_expanded = tf.expand_dims(mask, axis=-1)
+        displacement = tf.where(mask_expanded, 0, y_pred - tf.cast(y_true, tf.float32))
+        distance = tf.norm(displacement, axis=-1)
+        
+        return (tf.reduce_sum(distance, axis=-1) + self.smooth_nr) / (tf.reduce_sum(1.0-tf.cast(mask, dtype=tf.float32), axis=-1) + self.smooth_dr)
+
+    def get_config(self) -> dict:
+        """Return the config dictionary for recreating this class."""
+        config = super().get_config()
+        config.update(
+            binary=self.binary,
+            background_weight=self.background_weight,
+            smooth_nr=self.smooth_nr,
+            smooth_dr=self.smooth_dr,
+        )
+        return config
 
 class CrossEntropy(tf.keras.losses.Loss):
     """
