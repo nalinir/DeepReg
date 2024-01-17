@@ -118,14 +118,14 @@ class DataLoader:
         dataset = self.get_dataset()
 
         # resize
-        dataset = dataset.map(
-            lambda x: resize_inputs(
-                inputs=x,
-                moving_image_size=self.moving_image_shape,
-                fixed_image_size=self.fixed_image_shape,
-            ),
-            num_parallel_calls=num_parallel_calls,
-        )
+        # dataset = dataset.map(
+        #    lambda x: resize_inputs(
+        #        inputs=x,
+        #        moving_image_size=self.moving_image_shape,
+        #        fixed_image_size=self.fixed_image_shape,
+        #    ),
+        #    num_parallel_calls=num_parallel_calls,
+        #)
 
         # shuffle / repeat / batch / preprocess
         if training and shuffle_buffer_num_batch > 0:
