@@ -378,6 +378,97 @@ class DDFModel(RegistrationModel):
 
     name = "DDFModel"
 
+    def __init__(
+        self,
+        moving_image_size: Tuple,
+        fixed_image_size: Tuple,
+        moving_label_size: Tuple,
+        fixed_label_size: Tuple,
+        index_size: int,
+        labeled: bool,
+        batch_size: int,
+        config: dict,
+        name: str = "RegistrationModel",
+    ):
+        """
+        Init.
+
+        :param moving_image_size: (m_dim1, m_dim2, m_dim3)
+        :param fixed_image_size: (f_dim1, f_dim2, f_dim3)
+        :param moving_label_size: (m_dim1, m_dim2, m_dim3)
+        :param fixed_label_size: (f_dim1, f_dim2, f_dim3)
+        :param index_size: number of indices for identify each sample
+        :param labeled: if the data is labeled
+        :param batch_size: total number of samples consumed per step, over all devices.
+            When using multiple devices, TensorFlow automatically split the tensors.
+            Therefore, input shapes should be defined over batch_size.
+        :param config: config for method, backbone, and loss.
+        :param name: name of the model
+        """
+        super().__init__(
+            moving_image_size=moving_image_size,
+            fixed_image_size=fixed_image_size,
+            index_size=index_size,
+            labeled=labeled,
+            batch_size=batch_size,
+            config=config,
+            name=name,
+        )
+        self.moving_label_size = moving_label_size
+        self.fixed_label_size = fixed_label_size
+
+    def build_inputs(self) -> Dict[str, tf.keras.layers.Input]:
+        """
+        Build input tensors.
+
+        :return: dict of inputs.
+        """
+        # (batch, m_dim1, m_dim2, m_dim3)
+        moving_image = tf.keras.Input(
+            shape=self.moving_image_size,
+            batch_size=self.batch_size,
+            name="moving_image",
+        )
+        # (batch, f_dim1, f_dim2, f_dim3)
+        fixed_image = tf.keras.Input(
+            shape=self.fixed_image_size,
+            batch_size=self.batch_size,
+            name="fixed_image",
+        )
+        # (batch, index_size)
+        indices = tf.keras.Input(
+            shape=(self.index_size,),
+            batch_size=self.batch_size,
+            name="indices",
+        )
+
+        if not self.labeled:
+            return dict(
+                moving_image=moving_image, fixed_image=fixed_image, indices=indices
+            )
+
+        # (batch, m_dim1, m_dim2, m_dim3)
+        moving_label = tf.keras.Input(
+            shape=self.moving_label_size,
+            batch_size=self.batch_size,
+            name="moving_label",
+            dtype=tf.int32
+        )
+        # (batch, m_dim1, m_dim2, m_dim3)
+        fixed_label = tf.keras.Input(
+            shape=self.fixed_label_size,
+            batch_size=self.batch_size,
+            name="fixed_label",
+            dtype=tf.int32
+        )
+        return dict(
+            moving_image=moving_image,
+            fixed_image=fixed_image,
+            moving_label=moving_label,
+            fixed_label=fixed_label,
+            indices=indices,
+        )
+
     def _resize_interpolate(self, field, control_points):
         resize = layer.ResizeCPTransform(control_points)
         field = resize(field)
