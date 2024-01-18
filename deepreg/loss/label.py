@@ -324,7 +324,7 @@ class CentroidDistScore(tf.keras.losses.Loss):
         self,
         smooth_nr: float = EPS,
         smooth_dr: float = EPS,
-        name: str = "DiceScore",
+        name: str = "CentroidDistance",
         **kwargs,
     ):
         """
