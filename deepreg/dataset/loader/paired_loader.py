@@ -4,6 +4,7 @@ Supported formats: h5 and Nifti.
 Image data can be labeled or unlabeled.
 """
 import random
+import tensorflow as tf
 from typing import List, Tuple, Union
 
 from deepreg.dataset.loader.interface import (
@@ -31,6 +32,8 @@ class PairedDataLoader(AbstractPairedDataLoader, GeneratorDataLoader):
         seed,
         moving_image_shape: Union[Tuple[int, ...], List[int]],
         fixed_image_shape: Union[Tuple[int, ...], List[int]],
+        moving_label_shape: Union[Tuple[int, ...], List[int]],
+        fixed_label_shape: Union[Tuple[int, ...], List[int]]
     ):
         """
         :param file_loader:
@@ -44,6 +47,8 @@ class PairedDataLoader(AbstractPairedDataLoader, GeneratorDataLoader):
         :param moving_image_shape: (width, height, depth)
         :param fixed_image_shape: (width, height, depth)
         """
+        self.moving_label_shape = moving_label_shape
+        self.fixed_label_shape = fixed_label_shape
         super().__init__(
             moving_image_shape=moving_image_shape,
             fixed_image_shape=fixed_image_shape,
@@ -75,6 +80,40 @@ class PairedDataLoader(AbstractPairedDataLoader, GeneratorDataLoader):
             )
         self.validate_data_files()
         self.num_images = self.loader_moving_image.get_num_images()
+
+    def get_dataset(self):
+        """
+        Return a dataset from the generator.
+        """
+        if self.labeled:
+            return tf.data.Dataset.from_generator(
+                generator=self.data_generator,
+                output_types=dict(
+                    moving_image=tf.float32,
+                    fixed_image=tf.float32,
+                    moving_label=tf.float32,
+                    fixed_label=tf.float32,
+                    indices=tf.float32,
+                ),
+                output_shapes=dict(
+                    moving_image=tf.TensorShape(self.moving_image_shape),
+                    fixed_image=tf.TensorShape(self.fixed_image_shape),
+                    moving_label=tf.TensorShape(self.moving_label_shape),
+                    fixed_label=tf.TensorShape(self.fixed_label_shape),
+                    indices=self.num_indices,
+                ),
+            )
+        return tf.data.Dataset.from_generator(
+            generator=self.data_generator,
+            output_types=dict(
+                moving_image=tf.float32, fixed_image=tf.float32, indices=tf.float32
+            ),
+            output_shapes=dict(
+                moving_image=tf.TensorShape([None, None, None]),
+                fixed_image=tf.TensorShape([None, None, None]),
+                indices=self.num_indices,
+            ),
+        )
 
     def validate_data_files(self):
         """Verify all loaders have the same files."""

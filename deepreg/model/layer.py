@@ -309,7 +309,7 @@ class CentroidWarping(tfkl.Layer):
     where vol = image, loc_shift = ddf
     """
 
-    def __init__(self, fixed_image_size: tuple, name: str = "warping", 
+    def __init__(self, fixed_image_size: tuple, name: str = "centroid_warping", 
                  interpolation: str = "linear", **kwargs):
         """
         Init.

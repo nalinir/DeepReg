@@ -118,14 +118,14 @@ class DataLoader:
         dataset = self.get_dataset()
 
         # resize
-        # dataset = dataset.map(
-        #    lambda x: resize_inputs(
-        #        inputs=x,
-        #        moving_image_size=self.moving_image_shape,
-        #        fixed_image_size=self.fixed_image_shape,
-        #    ),
-        #    num_parallel_calls=num_parallel_calls,
-        #)
+        dataset = dataset.map(
+            lambda x: resize_inputs(
+                inputs=x,
+                moving_image_size=self.moving_image_shape,
+                fixed_image_size=self.fixed_image_shape,
+            ),
+            num_parallel_calls=num_parallel_calls,
+        )
 
         # shuffle / repeat / batch / preprocess
         if training and shuffle_buffer_num_batch > 0:
@@ -283,8 +283,8 @@ class GeneratorDataLoader(DataLoader, ABC):
                 output_shapes=dict(
                     moving_image=tf.TensorShape([None, None, None]),
                     fixed_image=tf.TensorShape([None, None, None]),
-                    moving_label=tf.TensorShape([None, None, None]),
-                    fixed_label=tf.TensorShape([None, None, None]),
+                    moving_label=tf.TensorShape([None, None]),
+                    fixed_label=tf.TensorShape([None, None]),
                     indices=self.num_indices,
                 ),
             )
@@ -404,26 +404,26 @@ class GeneratorDataLoader(DataLoader, ABC):
             for arr, name in zip(
                 [moving_label, fixed_label], ["moving_label", "fixed_label"]
             ):
-                if len(arr.shape) not in [3, 4]:
+                if len(arr.shape) not in [2]:
                     raise ValueError(
-                        f"Sample {image_indices}'s {name}'s shape should be 3D or 4D. "
+                        f"Sample {image_indices}'s {name}'s shape should be 2D. "
                         f"Got {arr.shape}."
                     )
             # image and label is better to have the same shape
-            if moving_image.shape[:3] != moving_label.shape[:3]:  # pragma: no cover
-                logger.warning(
-                    f"Sample {image_indices}'s moving image and label "
-                    f"have different shapes. "
-                    f"moving_image.shape = {moving_image.shape}, "
-                    f"moving_label.shape = {moving_label.shape}"
-                )
-            if fixed_image.shape[:3] != fixed_label.shape[:3]:  # pragma: no cover
-                logger.warning(
-                    f"Sample {image_indices}'s fixed image and label "
-                    f"have different shapes. "
-                    f"fixed_image.shape = {fixed_image.shape}, "
-                    f"fixed_label.shape = {fixed_label.shape}"
-                )
+            # if moving_image.shape[:3] != moving_label.shape[:3]:  # pragma: no cover
+            #    logger.warning(
+            #        f"Sample {image_indices}'s moving image and label "
+            #        f"have different shapes. "
+            #        f"moving_image.shape = {moving_image.shape}, "
+            #        f"moving_label.shape = {moving_label.shape}"
+            #    )
+            # if fixed_image.shape[:3] != fixed_label.shape[:3]:  # pragma: no cover
+            #    logger.warning(
+            #        f"Sample {image_indices}'s fixed image and label "
+            #        f"have different shapes. "
+            #        f"fixed_image.shape = {fixed_image.shape}, "
+            #        f"fixed_label.shape = {fixed_label.shape}"
+            #    )
             # number of labels for fixed and fixed images should be the same
             num_labels_moving = (
                 1 if len(moving_label.shape) == 3 else moving_label.shape[-1]

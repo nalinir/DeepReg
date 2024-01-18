@@ -388,7 +388,7 @@ class DDFModel(RegistrationModel):
         labeled: bool,
         batch_size: int,
         config: dict,
-        name: str = "RegistrationModel",
+        name: str = "DDFModel",
     ):
         """
         Init.
@@ -405,6 +405,8 @@ class DDFModel(RegistrationModel):
         :param config: config for method, backbone, and loss.
         :param name: name of the model
         """
+        self.fixed_label_size=fixed_label_size
+        self.moving_label_size=moving_label_size
         super().__init__(
             moving_image_size=moving_image_size,
             fixed_image_size=fixed_image_size,
@@ -414,8 +416,6 @@ class DDFModel(RegistrationModel):
             config=config,
             name=name,
         )
-        self.moving_label_size = moving_label_size
-        self.fixed_label_size = fixed_label_size
 
     def build_inputs(self) -> Dict[str, tf.keras.layers.Input]:
         """
@@ -524,11 +524,6 @@ class DDFModel(RegistrationModel):
         # (f_dim1, f_dim2, f_dim3)
         # TODO: branch whether "moving" label should be moving image or fixed centroids based off of the label loss function, and modify loss function calling appropriately
         moving_label = self._inputs["moving_label"] # for centroid inputs, this will be the FIXED label
-
-        print(moving_label[0,:,0,0])
-        print(moving_label[0,0,:,0])
-        print(moving_label[0,0,0,:])
-        print(moving_label.shape)
         # TODO: Put 200 in an initialization argument
         # moving_label_one_hot = tf.one_hot(moving_label, depth=50, axis=-1)
         # print("Moving label data type")
