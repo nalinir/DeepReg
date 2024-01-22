@@ -633,7 +633,7 @@ class DVFModel(DDFModel):
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
         # (f_dim1, f_dim2, f_dim3, 3)
-        moving_label = self._inputs["moving_label"]
+        moving_label = tf.cast(self._inputs["moving_label"], tf.int32)
         pred_fixed_label = self._warping(inputs=[ddf, moving_label])
 
         self._outputs["pred_fixed_label"] = pred_fixed_label
