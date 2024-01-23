@@ -340,7 +340,7 @@ class CentroidWarping(tfkl.Layer):
         loc = self.grid_ref + ddf
         batched_coords = add_batch_dimension(coords) # (batch, n_labels, 4) where the first coordinate is batch index
         null_vector = initialize_null_vector(coords) # stores (-1,-1,-1) aka ROI not found
-        return warp_coordinate_batch(loc, batched_coords, null_vector)
+        return interpolate_warp(loc, batched_coords, null_vector)
 
     def get_config(self) -> dict:
         """Return the config dictionary for recreating this class."""
@@ -349,7 +349,7 @@ class CentroidWarping(tfkl.Layer):
         return config
 
 def add_batch_dimension(coord):
-    batch_indices = tf.range(tf.shape(coord)[0], dtype=tf.int32)
+    batch_indices = tf.range(tf.shape(coord)[0], dtype=coord.dtype)
 
     # Expand dims to match the shape of coord
     batch_indices = tf.expand_dims(batch_indices, axis=1)
@@ -367,6 +367,28 @@ def initialize_null_vector(coord):
     null_vector = tf.zeros_like(coord) - 1
 
     return add_batch_dimension(null_vector)
+
+def interpolate_warp(loc, coord, null_tensor):
+    # Split coord into its integer and fractional parts
+    coord_int = tf.floor(coord)
+    coord_frac = coord - coord_int
+
+    # Generate the 8 surrounding integer coordinates
+    offsets = tf.constant([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], 
+                           [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]], dtype=tf.float32)
+    surrounding_coords = coord_int[:, None, :] + offsets
+
+    # Warp each surrounding integer coordinate
+    warped_coords = [warp_coordinate_batch(loc, tf.cast(sc, tf.int32), null_tensor) for sc in tf.unstack(surrounding_coords, axis=1)]
+
+    # Calculate the weights for interpolation
+    weights = (1 - tf.abs(surrounding_coords - coord[:, None, :]))
+    weights = weights[:, :, 0] * weights[:, :, 1] * weights[:, :, 2]
+
+    # Interpolate the warped coordinates
+    interpolated_coord = tf.add_n([w * c for w, c in zip(tf.unstack(weights, axis=1), warped_coords)])
+
+    return interpolated_coord
 
 def warp_coordinate_batch(loc, coord, null_tensor):
     # Create a mask for null_tensor in coord
