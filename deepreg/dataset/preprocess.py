@@ -225,9 +225,22 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
     def transform_label(
         label: tf.Tensor, params: tf.Tensor
     ) -> tf.Tensor:
+        """
+        Apply the inverse affine transformation to the labels.
+        Invalid labels (-1, -1, -1) are not transformed.
+    
+        Parameters:
+        - theta: Tensor of shape (batch_size, 4, 3) representing affine transformation matrices.
+        - points: Tensor of shape (batch_size, N, 3) representing labels to be transformed.
+    
+        Returns:
+        - Transformed points tensor of shape (batch_size, N, 3).
+        """
         # Convert points to a TensorFlow tensor if it's not already
         points = tf.cast(label, dtype=tf.float32)
 
+        invalid_mask = tf.reduce_all(tf.equal(inputs["fixed_label"], -1), axis=-1) 
+        
         # Step 0: Compute the inverse of each transformation matrix
         # Pad theta to make it a square matrix (4x4) for inverse computation
         theta_padded = tf.pad(params, [[0, 0], [0, 0], [0, 1]], constant_values=0)
@@ -244,6 +257,9 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
         # Drop the last column as it's not needed after transformation
         transformed_points = transformed_points[:, :, :3]
 
+        # Keep invalid labels unchanged
+        transformed_points = tf.where(tf.expand_dims(invalid_mask, -1), points, transformed_points)
+    
         return transformed_points
 
     @staticmethod
