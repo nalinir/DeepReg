@@ -171,7 +171,7 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
         :return: a tuple of tensors, each has shape = (batch, 4, 3)
         """
         theta = gen_rand_affine_transform(
-            batch_size=self.batch_size, scale=self.scale, seed=42
+            batch_size=self.batch_size, scale=self.scale
         )
         return theta
 
