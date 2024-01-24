@@ -238,7 +238,7 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
         # Convert points to a TensorFlow tensor if it's not already
         points = tf.cast(label, dtype=tf.float32)
 
-        invalid_mask = tf.reduce_all(tf.equal(inputs["fixed_label"], -1), axis=-1) 
+        invalid_mask = tf.reduce_all(tf.equal(label, -1), axis=-1) 
         
         # Step 0: Compute the inverse of each transformation matrix
         # Pad theta to make it a square matrix (4x4) for inverse computation
