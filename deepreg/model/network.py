@@ -523,7 +523,7 @@ class DDFModel(RegistrationModel):
         # warping_multichannel = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size)
         # (f_dim1, f_dim2, f_dim3)
         # TODO: branch whether "moving" label should be moving image or fixed centroids based off of the label loss function, and modify loss function calling appropriately
-        moving_label = self._inputs["moving_label"] # for centroid inputs, this will be the FIXED label
+        moving_label = tf.cast(self._inputs["moving_label"], tf.float32) # for centroid inputs, this will be the FIXED label
         # TODO: Put 200 in an initialization argument
         # moving_label_one_hot = tf.one_hot(moving_label, depth=50, axis=-1)
         # print("Moving label data type")
