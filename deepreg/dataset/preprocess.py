@@ -221,9 +221,8 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
             indices=indices,
         )
 
-    @staticmethod
     def transform_label(
-        label: tf.Tensor, params: tf.Tensor
+        self, label: tf.Tensor, params: tf.Tensor
     ) -> tf.Tensor:
         """
         Apply the inverse affine transformation to the labels.
@@ -259,6 +258,15 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
 
         # Keep invalid labels unchanged
         transformed_points = tf.where(tf.expand_dims(invalid_mask, -1), points, transformed_points)
+
+        # Create masks for invalid coordinates
+        mask_negative = tf.reduce_any(transformed_points < 0, axis=-1)
+        mask_overflow = tf.reduce_any(transformed_points >= self.fixed_image_size, axis=-1)  # Assuming 1 for the third coordinate
+        mask_invalid = tf.logical_or(mask_negative, mask_overflow)
+        
+        # Replace invalid coordinates
+        replacement = tf.constant([-1.0, -1.0, -1.0])
+        transformed_points = tf.where(tf.expand_dims(mask_invalid, -1), tf.broadcast_to(replacement, tf.shape(transformed_points)), transformed_points)
     
         return transformed_points
 
