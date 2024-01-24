@@ -342,12 +342,6 @@ class CentroidWarping(tfkl.Layer):
         null_vector = initialize_null_vector(coords) # stores (-1,-1,-1) aka ROI not found
         return interpolate_warp(loc, batched_coords, null_vector)
 
-    def get_config(self) -> dict:
-        """Return the config dictionary for recreating this class."""
-        config = super().get_config()
-        config["fixed_image_size"] = self._fixed_image_size
-        return config
-
 def add_batch_dimension(coord):
     batch_indices = tf.range(tf.shape(coord)[0], dtype=coord.dtype)
 
@@ -364,33 +358,11 @@ def add_batch_dimension(coord):
     return tf.concat([batch_indices, coord], axis=-1)
 
 def initialize_null_vector(coord):
-    null_vector = tf.zeros_like(coord) - 1
+    null_vector = tf.zeros_like(coord) - 1.0
 
     return add_batch_dimension(null_vector)
 
 def interpolate_warp(loc, coord, null_tensor):
-    # Split coord into its integer and fractional parts
-    coord_int = tf.floor(coord)
-    coord_frac = coord - coord_int
-
-    # Generate the 8 surrounding integer coordinates
-    offsets = tf.constant([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], 
-                           [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]], dtype=tf.float32)
-    surrounding_coords = coord_int[:, None, :] + offsets
-
-    # Warp each surrounding integer coordinate
-    warped_coords = [warp_coordinate_batch(loc, tf.cast(sc, tf.int32), null_tensor) for sc in tf.unstack(surrounding_coords, axis=1)]
-
-    # Calculate the weights for interpolation
-    weights = (1 - tf.abs(surrounding_coords - coord[:, None, :]))
-    weights = weights[:, :, 0] * weights[:, :, 1] * weights[:, :, 2]
-
-    # Interpolate the warped coordinates
-    interpolated_coord = tf.add_n([w * c for w, c in zip(tf.unstack(weights, axis=1), warped_coords)])
-
-    return interpolated_coord
-
-def warp_coordinate_batch(loc, coord, null_tensor):
     # Create a mask for null_tensor in coord
     mask = tf.math.reduce_all(tf.equal(coord, null_tensor), axis=-1)
 
@@ -399,13 +371,48 @@ def warp_coordinate_batch(loc, coord, null_tensor):
     
     # Tile to match the last dimension of coord
     mask = tf.tile(mask, [1, 1, tf.shape(coord)[-1]])
+    
+    # Split coord into its integer and fractional parts
+    coord_int = tf.floor(coord)
+    coord_frac = coord - coord_int
 
+    # Generate the 8 surrounding integer coordinates
+    offsets = tf.constant([[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0], [0, 0, 1, 1], 
+                           [0, 1, 0, 0], [0, 1, 0, 1], [0, 1, 1, 0], [0, 1, 1, 1]], dtype=tf.float32)
+
+    # Reshape offsets to make it broadcastable with coord_int
+    offsets = tf.reshape(offsets, [1, 1, 8, 4])
+
+    # print(offsets.shape)
+    
+    # Reshape coord_int to add an extra dimension for broadcasting
+    coord_int_expanded = tf.expand_dims(coord_int, 2)  # Shape: (batch_size, N, 1, 3)
+
+    # print(coord_int_expanded.shape)
+
+    surrounding_coords = coord_int_expanded + offsets
+
+    # print(surrounding_coords.shape)
+
+    # Warp each surrounding integer coordinate
+    warped_coords = [warp_coordinate_batch(loc, tf.cast(sc, tf.int32), mask, coord) for sc in tf.unstack(surrounding_coords, axis=2)]
+
+    # Calculate the weights for interpolation
+    weights = (1 - tf.abs(surrounding_coords - coord[:, :, None, :]))
+    weights = weights[:, :, :, 1] * weights[:, :, :, 2] * weights[:, :, :, 3]
+
+    # Interpolate the warped coordinates
+    interpolated_coord = tf.add_n([w * c for w, c in zip(tf.unstack(weights[:,:,:,None], axis=2), warped_coords)])
+
+    return interpolated_coord
+
+def warp_coordinate_batch(loc, coord, mask, orig_coord):
     # Use tf.gather_nd to replace the loop
     indices = tf.cast(tf.where(mask, 0, coord), tf.int32)
     ret_coord = tf.gather_nd(loc, indices)
 
     # Use tf.where to handle the null_tensor condition
-    ret_coord = tf.where(mask[:,:,1:], tf.cast(coord[:,:,1:], tf.float32), ret_coord)
+    ret_coord = tf.where(mask[:,:,1:], tf.cast(orig_coord[:,:,1:], tf.float32), ret_coord)
 
     return ret_coord
 
