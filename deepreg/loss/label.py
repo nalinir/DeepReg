@@ -350,7 +350,9 @@ class CentroidDistScore(tf.keras.losses.Loss):
         :param y_pred: shape = (batch, ...)
         :return: shape = (batch,)
         """
-        mask = tf.math.reduce_all(tf.equal(y_true, -1), axis=-1) # values that weren't in the original moving image
+        mask_true = tf.math.reduce_all(tf.equal(y_true, -1.0), axis=-1) # values that weren't in the original moving image
+        mask_pred = tf.math.reduce_all(tf.equal(y_pred, -1.0), axis=-1) # values that weren't in the original fixed image (only way to get -1 is to be outside the image)
+        mask = tf.math.logical_or(mask_true, mask_pred)
 
         mask_expanded = tf.expand_dims(mask, axis=-1)
         displacement = tf.where(mask_expanded, 0.0, y_pred - tf.cast(y_true, tf.float32))
