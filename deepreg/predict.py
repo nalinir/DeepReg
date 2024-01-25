@@ -325,7 +325,7 @@ def normalize_batched_image(batched_image, eps=1e-7):
     return batched_image
 
 
-def unwrapped_predict(batched_fixed_img, batched_moving_img, output_dir, model=None, model_ckpt_path=None, model_config_path=None):
+def unwrapped_predict(batched_fixed_img, batched_moving_img, output_dir, fixed_label_size, moving_label_size, model=None, model_ckpt_path=None, model_config_path=None):
     """
     Function to predict some metrics from the saved model and logging results.
     """
@@ -356,6 +356,8 @@ def unwrapped_predict(batched_fixed_img, batched_moving_img, output_dir, model=N
                     name=config["train"]["method"],
                     moving_image_size=moving_image_shape,
                     fixed_image_size=fixed_image_shape,
+                    moving_label_size=moving_label_size,
+                    fixed_label_size=fixed_label_size,
                     index_size=2,
                     labeled=config["dataset"]["test"]["labeled"],
                     batch_size=batch_size,
