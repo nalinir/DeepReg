@@ -128,7 +128,7 @@ class RegistrationModel(tf.keras.Model):
             shape=self.fixed_image_size,
             batch_size=self.batch_size,
             name="fixed_label",
-            dtype=tf.int32
+            dtype=tf.float32
         )
         return dict(
             moving_image=moving_image,
@@ -452,14 +452,14 @@ class DDFModel(RegistrationModel):
             shape=self.moving_label_size,
             batch_size=self.batch_size,
             name="moving_label",
-            dtype=tf.int32
+            dtype=tf.float32
         )
         # (batch, m_dim1, m_dim2, m_dim3)
         fixed_label = tf.keras.Input(
             shape=self.fixed_label_size,
             batch_size=self.batch_size,
             name="fixed_label",
-            dtype=tf.int32
+            dtype=tf.float32
         )
         return dict(
             moving_image=moving_image,
