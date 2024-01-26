@@ -229,8 +229,8 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
         Invalid labels (-1, -1, -1) are not transformed.
     
         Parameters:
-        - theta: Tensor of shape (batch_size, 4, 3) representing affine transformation matrices.
-        - points: Tensor of shape (batch_size, N, 3) representing labels to be transformed.
+        - label: Tensor of shape (batch_size, N, 3) representing labels to be transformed.
+        - params: Tensor of shape (batch_size, 4, 3) representing affine transformation matrices.
     
         Returns:
         - Transformed points tensor of shape (batch_size, N, 3).
