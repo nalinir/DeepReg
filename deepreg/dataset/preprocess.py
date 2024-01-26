@@ -54,7 +54,7 @@ class RandomTransformation3D(tf.keras.layers.Layer):
     @staticmethod
     @abstractmethod
     def transform(
-        image: tf.Tensor, grid_ref: tf.Tensor, params: tf.Tensor
+        image: tf.Tensor, grid_ref: tf.Tensor, params: tf.Tensor, batch_size: int
     ) -> tf.Tensor:
         """
         Transforms the reference grid and then resample the image.
@@ -90,8 +90,8 @@ class RandomTransformation3D(tf.keras.layers.Layer):
 
         moving_params, fixed_params = self.gen_transform_params()
 
-        moving_image = self.transform(moving_image, self.moving_grid_ref, moving_params)
-        fixed_image = self.transform(fixed_image, self.fixed_grid_ref, fixed_params)
+        moving_image = self.transform(moving_image, self.moving_grid_ref, moving_params, self.batch_size)
+        fixed_image = self.transform(fixed_image, self.fixed_grid_ref, fixed_params, self.batch_size)
 
         if "moving_label" not in inputs:  # unlabeled
             return dict(
@@ -100,8 +100,8 @@ class RandomTransformation3D(tf.keras.layers.Layer):
         moving_label = inputs["moving_label"]
         fixed_label = inputs["fixed_label"]
 
-        moving_label = self.transform(moving_label, self.moving_grid_ref, moving_params)
-        fixed_label = self.transform(fixed_label, self.fixed_grid_ref, fixed_params)
+        moving_label = self.transform(moving_label, self.moving_grid_ref, moving_params, self.batch_size)
+        fixed_label = self.transform(fixed_label, self.fixed_grid_ref, fixed_params, self.batch_size)
 
         return dict(
             moving_image=moving_image,
@@ -200,8 +200,8 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
 
         params = self.gen_transform_params()
 
-        moving_image = self.transform(moving_image, self.moving_grid_ref, params)
-        fixed_image = self.transform(fixed_image, self.fixed_grid_ref,params)
+        moving_image = self.transform(moving_image, self.moving_grid_ref, params, self.batch_size)
+        fixed_image = self.transform(fixed_image, self.fixed_grid_ref,params, self.batch_size)
 
         if "moving_label" not in inputs:  # unlabeled
             return dict(
@@ -272,7 +272,7 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
 
     @staticmethod
     def transform(
-        image: tf.Tensor, grid_ref: tf.Tensor, params: tf.Tensor
+        image: tf.Tensor, grid_ref: tf.Tensor, params: tf.Tensor, batch_size: int
     ) -> tf.Tensor:
         """
         Transforms the reference grid and then resample the image.
@@ -282,7 +282,7 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
         :param params: shape = (batch, 4, 3)
         :return: shape = (batch, dim1, dim2, dim3)
         """
-        return resample(vol=image, loc=warp_grid(grid_ref, params))
+        return resample(vol=image, loc=warp_grid(grid_ref, params), batch_size=batch_size)
 
 
 @REGISTRY.register_data_augmentation(name="affine")
@@ -337,7 +337,7 @@ class RandomAffineTransform3D(RandomTransformation3D):
 
     @staticmethod
     def transform(
-        image: tf.Tensor, grid_ref: tf.Tensor, params: tf.Tensor
+        image: tf.Tensor, grid_ref: tf.Tensor, params: tf.Tensor, batch_size: int
     ) -> tf.Tensor:
         """
         Transforms the reference grid and then resample the image.
@@ -347,7 +347,7 @@ class RandomAffineTransform3D(RandomTransformation3D):
         :param params: shape = (batch, 4, 3)
         :return: shape = (batch, dim1, dim2, dim3)
         """
-        return resample(vol=image, loc=warp_grid(grid_ref, params))
+        return resample(vol=image, loc=warp_grid(grid_ref, params), batch_size=batch_size)
 
 
 @REGISTRY.register_data_augmentation(name="ddf")
@@ -426,7 +426,7 @@ class RandomDDFTransform3D(RandomTransformation3D):
 
     @staticmethod
     def transform(
-        image: tf.Tensor, grid_ref: tf.Tensor, params: tf.Tensor
+        image: tf.Tensor, grid_ref: tf.Tensor, params: tf.Tensor, batch_size: int
     ) -> tf.Tensor:
         """
         Transforms the reference grid and then resample the image.
@@ -436,7 +436,7 @@ class RandomDDFTransform3D(RandomTransformation3D):
         :param params: DDF, shape = (batch, dim1, dim2, dim3, 3)
         :return: shape = (batch, dim1, dim2, dim3)
         """
-        return resample(vol=image, loc=grid_ref[None, ...] + params)
+        return resample(vol=image, loc=grid_ref[None, ...] + params, batch_size=batch_size)
 
 
 def resize_inputs(

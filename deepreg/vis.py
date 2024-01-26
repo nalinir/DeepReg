@@ -158,7 +158,7 @@ def gif_warp(
                 image = np.expand_dims(image, axis=0)
                 ddf = np.expand_dims(ddf, axis=0) * ddf_scaler
 
-                warped_image = Warping(fixed_image_size=fixed_image_shape)([ddf, image])
+                warped_image = Warping(fixed_image_size=fixed_image_shape, batch_size=1)([ddf, image])
                 warped_image = np.squeeze(warped_image.numpy())
 
                 frame = plt.imshow(

@@ -232,7 +232,7 @@ class Warping(tfkl.Layer):
     where vol = image, loc_shift = ddf
     """
 
-    def __init__(self, fixed_image_size: tuple, name: str = "warping", 
+    def __init__(self, fixed_image_size: tuple, batch_size: int, name: str = "warping", 
                  interpolation: str = "linear", **kwargs):
         """
         Init.
@@ -243,6 +243,7 @@ class Warping(tfkl.Layer):
         :param kwargs: additional arguments.
         """
         super().__init__(name=name, **kwargs)
+        self.batch_size = batch_size
         self._fixed_image_size = fixed_image_size
         # shape = (1, f_dim1, f_dim2, f_dim3, 3)
         self.grid_ref = layer_util.get_reference_grid(grid_size=fixed_image_size)[
@@ -260,7 +261,7 @@ class Warping(tfkl.Layer):
         :return: shape = (batch, f_dim1, f_dim2, f_dim3)
         """
         ddf, image = inputs
-        return layer_util.resample(vol=image, loc=self.grid_ref + ddf, interpolation=self.interpolation)
+        return layer_util.resample(vol=image, loc=self.grid_ref + ddf, batch_size=self.batch_size, interpolation=self.interpolation)
 
     def get_config(self) -> dict:
         """Return the config dictionary for recreating this class."""

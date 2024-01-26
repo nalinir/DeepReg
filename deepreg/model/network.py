@@ -511,7 +511,7 @@ class DDFModel(RegistrationModel):
             self._outputs = dict(ddf=ddf)
 
         # build outputs
-        warping = layer.Warping(fixed_image_size=self.fixed_image_size)
+        warping = layer.Warping(fixed_image_size=self.fixed_image_size, batch_size=self.batch_size)
         # (f_dim1, f_dim2, f_dim3)
         pred_fixed_image = warping(inputs=[ddf, moving_image])
         self._outputs["pred_fixed_image"] = pred_fixed_image
@@ -623,7 +623,7 @@ class DVFModel(DDFModel):
         ddf = layer.IntDVF(fixed_image_size=self.fixed_image_size)(dvf)
 
         # build outputs
-        self._warping = layer.Warping(fixed_image_size=self.fixed_image_size)
+        self._warping = layer.Warping(fixed_image_size=self.fixed_image_size, batch_size=self.batch_size)
         # (f_dim1, f_dim2, f_dim3, 3)
         pred_fixed_image = self._warping(inputs=[ddf, moving_image])
 
