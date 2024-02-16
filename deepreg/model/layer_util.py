@@ -208,7 +208,8 @@ def pyramid_combination(
         interpolation=interpolation
     )
     if interpolation == "nearest":
-        values_floor = tf.where(weight_floor[-1] > weight_ceil[-1], values_floor, 0)
+        values_floor = tf.where(weight_floor[-1] > weight_ceil[-1],
+                values_floor, tf.cast(0, values_floor.dtype))
     else:
         values_floor = values_floor * weight_floor[-1]
     values_ceil = pyramid_combination(
@@ -218,7 +219,8 @@ def pyramid_combination(
         interpolation=interpolation
     )
     if interpolation == "nearest":
-        values_ceil = tf.where(weight_floor[-1] > weight_ceil[-1], 0, values_ceil)
+        values_ceil = tf.where(weight_floor[-1] > weight_ceil[-1], tf.cast(0,
+            values_ceil.dtype), values_ceil)
     else:
         values_ceil = values_ceil * weight_ceil[-1]
     return values_floor + values_ceil
@@ -227,6 +229,7 @@ def pyramid_combination(
 def resample(
     vol: tf.Tensor,
     loc: tf.Tensor,
+    batch_size: int,
     interpolation: str = "linear",
     zero_boundary: bool = True,
 ) -> tf.Tensor:
@@ -273,7 +276,6 @@ def resample(
         raise ValueError("resample supports only linear and nearest interpolation")
 
     # init
-    batch_size = vol.shape[0]
     loc_shape = loc.shape[1:-1]
     dim_vol = loc.shape[-1]  # dimension of vol, n
     if dim_vol == len(vol.shape) - 1:
@@ -331,16 +333,7 @@ def resample(
     # batch_coords[b, l1, ..., lm] = b
     # range(batch_size) on axis 0 and repeated on other axes
     # add batch coords manually is faster than using batch_dims in tf.gather_nd
-    # TODO: added if statements to fix the None batch size issue
-    if batch_size == None:
-        # TODO: need to reset batch size here everytime changing training
-        # setting
-        batch_size = 1
-        print(f"Found batch size None so set batch size to {batch_size}")
 
-    # batch_coords[b, l1, ..., lm] = b
-    # range(batch_size) on axis 0 and repeated on other axes
-    # add batch coords manually is faster than using batch_dims in tf.gather_nd
     batch_coords = tf.tile(
         tf.reshape(tf.range(batch_size), [batch_size] + [1] * len(loc_shape)),
         [1] + loc_shape,

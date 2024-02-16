@@ -121,12 +121,14 @@ class RegistrationModel(tf.keras.Model):
             shape=self.moving_image_size,
             batch_size=self.batch_size,
             name="moving_label",
+            dtype=tf.int32
         )
         # (batch, m_dim1, m_dim2, m_dim3)
         fixed_label = tf.keras.Input(
             shape=self.fixed_image_size,
             batch_size=self.batch_size,
             name="fixed_label",
+            dtype=tf.float32
         )
         return dict(
             moving_image=moving_image,
@@ -276,12 +278,13 @@ class RegistrationModel(tf.keras.Model):
                 name="label",
                 inputs_dict=dict(y_true=fixed_label, y_pred=pred_fixed_label),
             )
-
+            # TODO: Fix this metric with the weird partially-one-hot labeling
+            # scheme
             # additional label metrics
-            tre = compute_centroid_distance(
-                y_true=fixed_label, y_pred=pred_fixed_label, grid=self.grid_ref
-            )
-            self._model.add_metric(tre, name="metric/TRE", aggregation="mean")
+            # tre = compute_centroid_distance(
+            #    y_true=fixed_label, y_pred=pred_fixed_label, grid=self.grid_ref
+            # )
+            # self._model.add_metric(tre, name="metric/TRE", aggregation="mean")
 
     def call(
         self, inputs: Dict[str, tf.Tensor], training=None, mask=None
@@ -344,7 +347,8 @@ class RegistrationModel(tf.keras.Model):
         :param tensor: tensor to monitor.
         :param name: name of the tensor.
         """
-        flatten = tf.reshape(tensor, shape=(self.batch_size, -1))
+        flatten = tf.cast(tf.reshape(tensor, shape=(self.batch_size, -1)),
+                tf.float32)
         self._model.add_metric(
             tf.reduce_mean(flatten, axis=1),
             name=f"metric/{name}_mean",
@@ -373,6 +377,97 @@ class DDFModel(RegistrationModel):
     """
 
     name = "DDFModel"
+
+    def __init__(
+        self,
+        moving_image_size: Tuple,
+        fixed_image_size: Tuple,
+        moving_label_size: Tuple,
+        fixed_label_size: Tuple,
+        index_size: int,
+        labeled: bool,
+        batch_size: int,
+        config: dict,
+        name: str = "DDFModel",
+    ):
+        """
+        Init.
+
+        :param moving_image_size: (m_dim1, m_dim2, m_dim3)
+        :param fixed_image_size: (f_dim1, f_dim2, f_dim3)
+        :param moving_label_size: (m_dim1, m_dim2, m_dim3)
+        :param fixed_label_size: (f_dim1, f_dim2, f_dim3)
+        :param index_size: number of indices for identify each sample
+        :param labeled: if the data is labeled
+        :param batch_size: total number of samples consumed per step, over all devices.
+            When using multiple devices, TensorFlow automatically split the tensors.
+            Therefore, input shapes should be defined over batch_size.
+        :param config: config for method, backbone, and loss.
+        :param name: name of the model
+        """
+        self.fixed_label_size=fixed_label_size
+        self.moving_label_size=moving_label_size
+        super().__init__(
+            moving_image_size=moving_image_size,
+            fixed_image_size=fixed_image_size,
+            index_size=index_size,
+            labeled=labeled,
+            batch_size=batch_size,
+            config=config,
+            name=name,
+        )
+
+    def build_inputs(self) -> Dict[str, tf.keras.layers.Input]:
+        """
+        Build input tensors.
+
+        :return: dict of inputs.
+        """
+        # (batch, m_dim1, m_dim2, m_dim3)
+        moving_image = tf.keras.Input(
+            shape=self.moving_image_size,
+            batch_size=self.batch_size,
+            name="moving_image",
+        )
+        # (batch, f_dim1, f_dim2, f_dim3)
+        fixed_image = tf.keras.Input(
+            shape=self.fixed_image_size,
+            batch_size=self.batch_size,
+            name="fixed_image",
+        )
+        # (batch, index_size)
+        indices = tf.keras.Input(
+            shape=(self.index_size,),
+            batch_size=self.batch_size,
+            name="indices",
+        )
+
+        if not self.labeled:
+            return dict(
+                moving_image=moving_image, fixed_image=fixed_image, indices=indices
+            )
+
+        # (batch, m_dim1, m_dim2, m_dim3)
+        moving_label = tf.keras.Input(
+            shape=self.moving_label_size,
+            batch_size=self.batch_size,
+            name="moving_label",
+            dtype=tf.float32
+        )
+        # (batch, m_dim1, m_dim2, m_dim3)
+        fixed_label = tf.keras.Input(
+            shape=self.fixed_label_size,
+            batch_size=self.batch_size,
+            name="fixed_label",
+            dtype=tf.float32
+        )
+        return dict(
+            moving_image=moving_image,
+            fixed_image=fixed_image,
+            moving_label=moving_label,
+            fixed_label=fixed_label,
+            indices=indices,
+        )
 
     def _resize_interpolate(self, field, control_points):
         resize = layer.ResizeCPTransform(control_points)
@@ -416,7 +511,7 @@ class DDFModel(RegistrationModel):
             self._outputs = dict(ddf=ddf)
 
         # build outputs
-        warping = layer.Warping(fixed_image_size=self.fixed_image_size)
+        warping = layer.Warping(fixed_image_size=self.fixed_image_size, batch_size=self.batch_size)
         # (f_dim1, f_dim2, f_dim3)
         pred_fixed_image = warping(inputs=[ddf, moving_image])
         self._outputs["pred_fixed_image"] = pred_fixed_image
@@ -424,13 +519,22 @@ class DDFModel(RegistrationModel):
         if not self.labeled:
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
-        warping = layer.Warping(fixed_image_size=self.fixed_image_size, interpolation="nearest")
-
+        warping_centroids = layer.CentroidWarping(fixed_image_size=self.fixed_image_size)
+        # warping_multichannel = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size)
         # (f_dim1, f_dim2, f_dim3)
-        moving_label = self._inputs["moving_label"]
-        pred_fixed_label = warping(inputs=[ddf, moving_label])
-
-        self._outputs["pred_fixed_label"] = pred_fixed_label
+        # TODO: branch whether "moving" label should be moving image or fixed centroids based off of the label loss function, and modify loss function calling appropriately
+        moving_label = tf.cast(self._inputs["moving_label"], tf.float32) # for centroid inputs, this will be the FIXED label
+        # TODO: Put 200 in an initialization argument
+        # moving_label_one_hot = tf.one_hot(moving_label, depth=50, axis=-1)
+        # print("Moving label data type")
+        # print(moving_label.dtype)
+        # print("One-hot moving label data type and shape")
+        # print(moving_label_one_hot.dtype)
+        # print(moving_label_one_hot.shape)
+        pred_fixed_label = warping_centroids(inputs=[ddf, moving_label])
+        # print("Fixed label data type")
+        # print(pred_fixed_label.dtype)
+        self._outputs["pred_fixed_label"] = pred_fixed_label # for centroid inputs, this will be the predicted MOVING label
         return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
     def build_loss(self):
@@ -519,7 +623,7 @@ class DVFModel(DDFModel):
         ddf = layer.IntDVF(fixed_image_size=self.fixed_image_size)(dvf)
 
         # build outputs
-        self._warping = layer.Warping(fixed_image_size=self.fixed_image_size)
+        self._warping = layer.Warping(fixed_image_size=self.fixed_image_size, batch_size=self.batch_size)
         # (f_dim1, f_dim2, f_dim3, 3)
         pred_fixed_image = self._warping(inputs=[ddf, moving_image])
 
@@ -529,7 +633,7 @@ class DVFModel(DDFModel):
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
         # (f_dim1, f_dim2, f_dim3, 3)
-        moving_label = self._inputs["moving_label"]
+        moving_label = tf.cast(self._inputs["moving_label"], tf.int32)
         pred_fixed_label = self._warping(inputs=[ddf, moving_label])
 
         self._outputs["pred_fixed_label"] = pred_fixed_label

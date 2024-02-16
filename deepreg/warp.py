@@ -70,7 +70,7 @@ def warp(image_path: str, ddf_path: str, out_path: str):
     ddf = tf.expand_dims(ddf, axis=0)
 
     # warp
-    warped_image = Warping(fixed_image_size=fixed_image_shape)([ddf, image])
+    warped_image = Warping(fixed_image_size=fixed_image_shape, batch_size=1)([ddf, image])
     warped_image = warped_image.numpy()
     warped_image = warped_image[0, ...]  # removed added batch dimension
 

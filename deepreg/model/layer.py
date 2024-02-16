@@ -232,7 +232,85 @@ class Warping(tfkl.Layer):
     where vol = image, loc_shift = ddf
     """
 
-    def __init__(self, fixed_image_size: tuple, name: str = "warping", 
+    def __init__(self, fixed_image_size: tuple, batch_size: int, name: str = "warping", 
+                 interpolation: str = "linear", **kwargs):
+        """
+        Init.
+
+        :param fixed_image_size: shape = (f_dim1, f_dim2, f_dim3)
+             or (f_dim1, f_dim2, f_dim3, ch) with the last channel for features
+        :param name: name of the layer
+        :param kwargs: additional arguments.
+        """
+        super().__init__(name=name, **kwargs)
+        self.batch_size = batch_size
+        self._fixed_image_size = fixed_image_size
+        # shape = (1, f_dim1, f_dim2, f_dim3, 3)
+        self.grid_ref = layer_util.get_reference_grid(grid_size=fixed_image_size)[
+            None, ...
+        ]
+        self.interpolation = interpolation
+
+    def call(self, inputs, **kwargs) -> tf.Tensor:
+        """
+        :param inputs: (ddf, image)
+
+          - ddf, shape = (batch, f_dim1, f_dim2, f_dim3, 3)
+          - image, shape = (batch, m_dim1, m_dim2, m_dim3)
+        :param kwargs: additional arguments.
+        :return: shape = (batch, f_dim1, f_dim2, f_dim3)
+        """
+        ddf, image = inputs
+        return layer_util.resample(vol=image, loc=self.grid_ref + ddf, batch_size=self.batch_size, interpolation=self.interpolation)
+
+    def get_config(self) -> dict:
+        """Return the config dictionary for recreating this class."""
+        config = super().get_config()
+        config["fixed_image_size"] = self._fixed_image_size
+        return config
+
+
+class MultiChannelWarping(tfkl.Layer):
+    def __init__(self, fixed_image_size: tuple, name: str = "multi_channel_warping", 
+                 interpolation: str = "linear", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self._fixed_image_size = fixed_image_size
+        self.grid_ref = layer_util.get_reference_grid(grid_size=fixed_image_size)[None, ...]
+        self.interpolation = interpolation
+        self.warping_layer = Warping(fixed_image_size, interpolation=interpolation)
+
+    def call(self, inputs, **kwargs) -> tf.Tensor:
+        ddf, image = inputs
+
+        # Transpose image to bring channels to the front: (batch, channels, x, y, z)
+        image_transposed = tf.transpose(image, perm=[4, 0, 1, 2, 3])
+
+        # Apply warping using map_fn
+        def warp_channel(image_slice):
+            # image_slice shape is (batch, x, y, z) after slicing
+            return self.warping_layer([ddf, image_slice])
+
+        warped_image = tf.map_fn(warp_channel, image_transposed, dtype=tf.float32)
+
+        # Transpose back to original shape: (batch, x, y, z, channels)
+        return tf.transpose(warped_image, perm=[1, 2, 3, 4, 0])
+
+    def get_config(self) -> dict:
+        config = super().get_config()
+        config["fixed_image_size"] = self._fixed_image_size
+        return config
+
+class CentroidWarping(tfkl.Layer):
+    """
+    Warps a matrix of coordinates with DDF.
+
+    Reference:
+
+    https://github.com/adalca/neurite/blob/legacy/neuron/utils.py
+    where vol = image, loc_shift = ddf
+    """
+
+    def __init__(self, fixed_image_size: tuple, name: str = "centroid_warping", 
                  interpolation: str = "linear", **kwargs):
         """
         Init.
@@ -252,22 +330,92 @@ class Warping(tfkl.Layer):
 
     def call(self, inputs, **kwargs) -> tf.Tensor:
         """
-        :param inputs: (ddf, image)
+        :param inputs: (ddf, coordinates)
 
           - ddf, shape = (batch, f_dim1, f_dim2, f_dim3, 3)
-          - image, shape = (batch, m_dim1, m_dim2, m_dim3)
+          - coords, shape = (batch, n_labels, 3)
         :param kwargs: additional arguments.
         :return: shape = (batch, f_dim1, f_dim2, f_dim3)
         """
-        ddf, image = inputs
-        return layer_util.resample(vol=image, loc=self.grid_ref + ddf, interpolation=self.interpolation)
+        ddf, coords = inputs
+        loc = self.grid_ref + ddf
+        batched_coords = add_batch_dimension(coords) # (batch, n_labels, 4) where the first coordinate is batch index
+        null_vector = initialize_null_vector(coords) # stores (-1,-1,-1) aka ROI not found
+        return interpolate_warp(loc, batched_coords, null_vector)
 
-    def get_config(self) -> dict:
-        """Return the config dictionary for recreating this class."""
-        config = super().get_config()
-        config["fixed_image_size"] = self._fixed_image_size
-        return config
+def add_batch_dimension(coord):
+    batch_indices = tf.range(tf.shape(coord)[0], dtype=coord.dtype)
 
+    # Expand dims to match the shape of coord
+    batch_indices = tf.expand_dims(batch_indices, axis=1)
+    
+    # Tile to match the number of indices
+    batch_indices = tf.tile(batch_indices, [1, tf.shape(coord)[1]])
+    
+    # Expand dims to concatenate with coord
+    batch_indices = tf.expand_dims(batch_indices, axis=-1)
+    
+    # Concatenate batch_indices with coord to create the final indices
+    return tf.concat([batch_indices, coord], axis=-1)
+
+def initialize_null_vector(coord):
+    null_vector = tf.zeros_like(coord) - 1.0
+
+    return add_batch_dimension(null_vector)
+
+def interpolate_warp(loc, coord, null_tensor):
+    # Create a mask for null_tensor in coord
+    mask = tf.math.reduce_all(tf.equal(coord, null_tensor), axis=-1)
+
+    # Expand dims to match the shape of coord
+    mask = tf.expand_dims(mask, axis=-1)
+    
+    # Tile to match the last dimension of coord
+    mask = tf.tile(mask, [1, 1, tf.shape(coord)[-1]])
+    
+    # Split coord into its integer and fractional parts
+    coord_int = tf.floor(coord)
+    coord_frac = coord - coord_int
+
+    # Generate the 8 surrounding integer coordinates
+    offsets = tf.constant([[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0], [0, 0, 1, 1], 
+                           [0, 1, 0, 0], [0, 1, 0, 1], [0, 1, 1, 0], [0, 1, 1, 1]], dtype=tf.float32)
+
+    # Reshape offsets to make it broadcastable with coord_int
+    offsets = tf.reshape(offsets, [1, 1, 8, 4])
+
+    # print(offsets.shape)
+    
+    # Reshape coord_int to add an extra dimension for broadcasting
+    coord_int_expanded = tf.expand_dims(coord_int, 2)  # Shape: (batch_size, N, 1, 3)
+
+    # print(coord_int_expanded.shape)
+
+    surrounding_coords = coord_int_expanded + offsets
+
+    # print(surrounding_coords.shape)
+
+    # Warp each surrounding integer coordinate
+    warped_coords = [warp_coordinate_batch(loc, tf.cast(sc, tf.int32), mask, coord) for sc in tf.unstack(surrounding_coords, axis=2)]
+
+    # Calculate the weights for interpolation
+    weights = (1 - tf.abs(surrounding_coords - coord[:, :, None, :]))
+    weights = weights[:, :, :, 1] * weights[:, :, :, 2] * weights[:, :, :, 3]
+
+    # Interpolate the warped coordinates
+    interpolated_coord = tf.add_n([w * c for w, c in zip(tf.unstack(weights[:,:,:,None], axis=2), warped_coords)])
+
+    return interpolated_coord
+
+def warp_coordinate_batch(loc, coord, mask, orig_coord):
+    # Use tf.gather_nd to replace the loop
+    indices = tf.cast(tf.where(mask, 0, coord), tf.int32)
+    ret_coord = tf.gather_nd(loc, indices)
+
+    # Use tf.where to handle the null_tensor condition
+    ret_coord = tf.where(mask[:,:,1:], tf.cast(orig_coord[:,:,1:], tf.float32), ret_coord)
+
+    return ret_coord
 
 class ResidualBlock(tfkl.Layer):
     """
