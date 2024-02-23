@@ -401,7 +401,7 @@ def unwrapped_predict(batched_fixed_img, batched_moving_img, output_dir, fixed_l
 
     outputs = model(inputs, training=False)
 
-    return outputs, model
+    return outputs["ddf"].numpy(), outputs["pred_fixed_image"].numpy(), model
 
 
 
