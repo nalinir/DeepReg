@@ -156,13 +156,13 @@ class RegistrationModel(tf.keras.Model):
 
         resize_layer = layer.Resize3d(shape=self.fixed_image_size)
 
-        # (batch, m_dim1, m_dim2, m_dim3, 1)
-        moving_image = tf.expand_dims(moving_image, axis=4)
+        # (batch, m_dim1, m_dim2, m_dim3, [channel], 1)
+        moving_image = tf.expand_dims(moving_image, axis=len(moving_image.shape))
         moving_image = resize_layer(moving_image)
         images.append(moving_image)
 
         # (batch, m_dim1, m_dim2, m_dim3, 1)
-        fixed_image = tf.expand_dims(fixed_image, axis=4)
+        fixed_image = tf.expand_dims(fixed_image, axis=len(fixed_image.shape))
         images.append(fixed_image)
 
         # (batch, m_dim1, m_dim2, m_dim3, 1)
@@ -172,7 +172,7 @@ class RegistrationModel(tf.keras.Model):
             images.append(moving_label)
 
         # (batch, f_dim1, f_dim2, f_dim3, 2 or 3)
-        images = tf.concat(images, axis=4)
+        images = tf.concat(images, axis=len(moving_image.shape)-1)
         return images
 
     # TODO: add the hybrid option
@@ -485,9 +485,15 @@ class DDFModel(RegistrationModel):
         moving_image = self._inputs["moving_image"]  # (batch, m_dim1, m_dim2, m_dim3)
         fixed_image = self._inputs["fixed_image"]  # (batch, f_dim1, f_dim2, f_dim3)
 
+        print("Built inputs.")
+
         # build ddf
         control_points = self.config["backbone"].pop("control_points", False)
+
+        print("Built control points.")
         backbone_inputs = self.concat_images(moving_image, fixed_image)
+        print("Concatenated images.")
+        print(self.config["backbone"])
         backbone = REGISTRY.build_backbone(
             config=self.config["backbone"],
             default_args=dict(
@@ -497,6 +503,8 @@ class DDFModel(RegistrationModel):
                 out_activation=None,
             ),
         )
+
+        print("Built backbone.")
 
         if isinstance(backbone, GlobalNet):
             # (f_dim1, f_dim2, f_dim3, 3), (4, 3)
@@ -510,6 +518,7 @@ class DDFModel(RegistrationModel):
             )
             self._outputs = dict(ddf=ddf)
 
+        print("Built DDF.")
         # build outputs
         warping = layer.Warping(fixed_image_size=self.fixed_image_size, batch_size=self.batch_size)
         # (f_dim1, f_dim2, f_dim3)
@@ -535,6 +544,7 @@ class DDFModel(RegistrationModel):
         # print("Fixed label data type")
         # print(pred_fixed_label.dtype)
         self._outputs["pred_fixed_label"] = pred_fixed_label # for centroid inputs, this will be the predicted MOVING label
+        print("Built outputs.")
         return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
     def build_loss(self):
