@@ -318,16 +318,27 @@ class GlobalNormalizedCrossCorrelation(tf.keras.losses.Loss):
         :return: shape = (batch,)
         """
 
-        axis = [a for a in range(1, len(y_true.shape))]
+        # Assuming the channel dimension is the last one
+        if len(y_true.shape) == 5: # (batch, x, y, z, channel)
+            channel_dim = -1
+            axis = [a for a in range(1, len(y_true.shape) - 1)]
+        else:
+            axis = [a for a in range(1, len(y_true.shape))]
+
         mu_pred = tf.reduce_mean(y_pred, axis=axis, keepdims=True)
         mu_true = tf.reduce_mean(y_true, axis=axis, keepdims=True)
-        var_pred = tf.math.reduce_variance(y_pred, axis=axis)
-        var_true = tf.math.reduce_variance(y_true, axis=axis)
+        var_pred = tf.math.reduce_variance(y_pred, axis=axis) + EPS
+        var_true = tf.math.reduce_variance(y_true, axis=axis) + EPS
         numerator = tf.abs(
             tf.reduce_mean((y_pred - mu_pred) * (y_true - mu_true), axis=axis)
         )
 
-        return (numerator * numerator) / (var_pred * var_true + EPS)
+        gncc_per_channel = (numerator * numerator) / (var_pred * var_true)
+
+        if len(y_true.shape) == 5:
+            gncc = tf.reduce_mean(gncc_per_channel, axis=channel_dim)
+
+        return gncc
 
 
 @REGISTRY.register_loss(name="gncc")
