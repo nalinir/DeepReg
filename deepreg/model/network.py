@@ -487,15 +487,28 @@ class DDFModel(RegistrationModel):
         backbone_inputs = self.concat_images(moving_image, fixed_image)
         print("Concatenated images.")
         print(self.config["backbone"])
-        backbone = REGISTRY.build_backbone(
-            config=self.config["backbone"],
-            default_args=dict(
-                image_size=self.fixed_image_size[:3],
-                out_channels=3,
-                out_kernel_initializer="zeros",
-                out_activation=None,
-            ),
-        )
+
+        if self.config["single_channel"]:
+            backbone = REGISTRY.build_backbone(
+                config=self.config["backbone"],
+                default_args=dict(
+                    image_size=self.fixed_image_size,
+                    out_channels=3,
+                    out_kernel_initializer="zeros",
+                    out_activation=None,
+                ),
+            )
+
+        else:
+            backbone = REGISTRY.build_backbone(
+                config=self.config["backbone"],
+                default_args=dict(
+                    image_size=self.fixed_image_size[:3],
+                    out_channels=3,
+                    out_kernel_initializer="zeros",
+                    out_activation=None,
+                ),
+            )
 
         print("Built backbone.")
 
@@ -513,7 +526,10 @@ class DDFModel(RegistrationModel):
 
         print("Built DDF.")
         # build outputs
-        warping = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size[:3], batch_size=self.batch_size)
+        if self.config["single_channel"]:
+            warping = layer.Warping(fixed_image_size=self.fixed_image_size, batch_size=self.batch_size)
+        else:
+            warping = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size[:3], batch_size=self.batch_size)
         # (f_dim1, f_dim2, f_dim3)
         pred_fixed_image = warping(inputs=[ddf, moving_image])
         self._outputs["pred_fixed_image"] = pred_fixed_image
@@ -522,10 +538,13 @@ class DDFModel(RegistrationModel):
 
         if not self.labeled:
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
-        
-        print("This model shouldn't be labeled.")
+ 
+        #print("This model shouldn't be labeled.")
 
-        warping_centroids = layer.CentroidWarping(fixed_image_size=self.fixed_image_size[:3])
+        if self.config["single_channel"]:
+            warping_centroids = layer.CentroidWarping(fixed_image_size=self.fixed_image_size)
+        else:
+            warping_centroids = layer.CentroidWarping(fixed_image_size=self.fixed_image_size[:3])
         # warping_multichannel = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size)
         # (f_dim1, f_dim2, f_dim3)
         # TODO: branch whether "moving" label should be moving image or fixed centroids based off of the label loss function, and modify loss function calling appropriately
