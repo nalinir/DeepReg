@@ -76,3 +76,4 @@ train:
     num_parallel_calls: -1
     shuffle_buffer_num_batch: 2
   save_period: 1
+  single_channel: False
