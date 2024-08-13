@@ -177,10 +177,10 @@ class AbstractPairedDataLoader(DataLoader, ABC):
         :param kwargs: additional arguments.
         """
         super().__init__(num_indices=2, **kwargs)
-        if len(moving_image_shape) != 3 or len(fixed_image_shape) != 3:
+        if not (len(moving_image_shape) in [3, 4]) or not (len(fixed_image_shape) in [3, 4]):
             raise ValueError(
-                f"moving_image_shape and fixed_image_shape have length of three, "
-                f"corresponding to (width, height, depth), "
+                f"moving_image_shape and fixed_image_shape have length of three or four, "
+                f"corresponding to (width, height, depth, [color]), "
                 f"got moving_image_shape = {moving_image_shape} "
                 f"and fixed_image_shape = {fixed_image_shape}"
             )
@@ -227,10 +227,10 @@ class AbstractUnpairedDataLoader(DataLoader, ABC):
         :param kwargs: additional arguments.
         """
         super().__init__(num_indices=3, **kwargs)
-        if len(image_shape) != 3:
+        if not (len(image_shape) in [3, 4]):
             raise ValueError(
-                f"image_shape has to be length of three, "
-                f"corresponding to (width, height, depth), "
+                f"image_shape has to be length of three or four, "
+                f"corresponding to (width, height, depth, [color]), "
                 f"got {image_shape}"
             )
         self.image_shape = tuple(image_shape)
@@ -271,34 +271,66 @@ class GeneratorDataLoader(DataLoader, ABC):
         Return a dataset from the generator.
         """
         if self.labeled:
+            if len(self.moving_image_shape) == 3:
+                return tf.data.Dataset.from_generator(
+                    generator=self.data_generator,
+                    output_types=dict(
+                        moving_image=tf.float32,
+                        fixed_image=tf.float32,
+                        moving_label=tf.float32,
+                        fixed_label=tf.float32,
+                        indices=tf.float32,
+                    ),
+                    output_shapes=dict(
+                        moving_image=tf.TensorShape([None, None, None]),
+                        fixed_image=tf.TensorShape([None, None, None]),
+                        moving_label=tf.TensorShape([None, None]),
+                        fixed_label=tf.TensorShape([None, None]),
+                        indices=self.num_indices,
+                    ),
+                )
+            else: # length 4
+                return tf.data.Dataset.from_generator(
+                    generator=self.data_generator,
+                    output_types=dict(
+                        moving_image=tf.float32,
+                        fixed_image=tf.float32,
+                        moving_label=tf.float32,
+                        fixed_label=tf.float32,
+                        indices=tf.float32,
+                    ),
+                    output_shapes=dict(
+                        moving_image=tf.TensorShape([None, None, None, None]),
+                        fixed_image=tf.TensorShape([None, None, None, None]),
+                        moving_label=tf.TensorShape([None, None]),
+                        fixed_label=tf.TensorShape([None, None]),
+                        indices=self.num_indices,
+                    ),
+                )
+        if len(self.moving_image_shape) == 3:  
             return tf.data.Dataset.from_generator(
                 generator=self.data_generator,
                 output_types=dict(
-                    moving_image=tf.float32,
-                    fixed_image=tf.float32,
-                    moving_label=tf.float32,
-                    fixed_label=tf.float32,
-                    indices=tf.float32,
+                    moving_image=tf.float32, fixed_image=tf.float32, indices=tf.float32
                 ),
                 output_shapes=dict(
                     moving_image=tf.TensorShape([None, None, None]),
                     fixed_image=tf.TensorShape([None, None, None]),
-                    moving_label=tf.TensorShape([None, None]),
-                    fixed_label=tf.TensorShape([None, None]),
                     indices=self.num_indices,
                 ),
             )
-        return tf.data.Dataset.from_generator(
-            generator=self.data_generator,
-            output_types=dict(
-                moving_image=tf.float32, fixed_image=tf.float32, indices=tf.float32
-            ),
-            output_shapes=dict(
-                moving_image=tf.TensorShape([None, None, None]),
-                fixed_image=tf.TensorShape([None, None, None]),
-                indices=self.num_indices,
-            ),
-        )
+        else: # length 4
+            return tf.data.Dataset.from_generator(
+                generator=self.data_generator,
+                output_types=dict(
+                    moving_image=tf.float32, fixed_image=tf.float32, indices=tf.float32
+                ),
+                output_shapes=dict(
+                    moving_image=tf.TensorShape([None, None, None, None]),
+                    fixed_image=tf.TensorShape([None, None, None, None]),
+                    indices=self.num_indices,
+                ),
+            )
 
     def data_generator(self):
         """
@@ -393,7 +425,7 @@ class GeneratorDataLoader(DataLoader, ABC):
         for arr, name in zip(
             [moving_image, fixed_image], ["moving_image", "fixed_image"]
         ):
-            if len(arr.shape) != 3 or min(arr.shape) <= 0:
+            if not (len(arr.shape) in [3, 4]) or min(arr.shape) <= 0:
                 raise ValueError(
                     f"Sample {image_indices}'s {name}'s shape should be 3D"
                     f" and non-empty, got {arr.shape}."

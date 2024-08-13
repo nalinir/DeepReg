@@ -109,8 +109,8 @@ class PairedDataLoader(AbstractPairedDataLoader, GeneratorDataLoader):
                 moving_image=tf.float32, fixed_image=tf.float32, indices=tf.float32
             ),
             output_shapes=dict(
-                moving_image=tf.TensorShape([None, None, None]),
-                fixed_image=tf.TensorShape([None, None, None]),
+                moving_image=tf.TensorShape(self.moving_image_shape),
+                fixed_image=tf.TensorShape(self.fixed_image_shape),
                 indices=self.num_indices,
             ),
         )

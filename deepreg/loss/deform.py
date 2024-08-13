@@ -317,7 +317,7 @@ class NonRigidPenalty(tf.keras.layers.Layer):
 class HybridNorm(tf.keras.layers.Layer):
 
     def __init__(self,
-        weight: dict = {"nonrigid": 0.02,
+        hybrid_weight: dict = {"nonrigid": 0.02,
                         "gradient": 0.02,
                         "diff": 0.005,
                         "axisdiff": 0.001},
@@ -337,10 +337,10 @@ class HybridNorm(tf.keras.layers.Layer):
         super().__init__(name=name)
         self.axis = axis
         self.l1 = l1
-        self.nonrigid_weight = weight["nonrigid"]
-        self.gradientNorm_weight = weight["gradient"]
-        self.differenceNorm_weight = weight["diff"]
-        self.axisdiffNorm_weight = weight["axisdiff"]
+        self.nonrigid_weight = hybrid_weight["nonrigid"]
+        self.gradientNorm_weight = hybrid_weight["gradient"]
+        self.differenceNorm_weight = hybrid_weight["diff"]
+        self.axisdiffNorm_weight = hybrid_weight["axisdiff"]
         self.img_size = img_size
         grid_ref = tf.expand_dims(layer_util.get_reference_grid(grid_size=self.img_size), axis=0)
         self.ddf_ref = -grid_ref
@@ -348,7 +348,6 @@ class HybridNorm(tf.keras.layers.Layer):
         assert img_size != (0, 0, 0), "img_size must be set to a value other than (0, 0, 0)"
 
     def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
-
         assert len(inputs.shape) == 5
         ddf = inputs
         # compute the nonrigid penalty
@@ -366,7 +365,7 @@ class HybridNorm(tf.keras.layers.Layer):
                     dfdy_nonrigid ** 2 + dfdz_nonrigid ** 2) - 2.0)
             nonrigid_norm = tf.reduce_mean(nonrigid_norms, axis=[1, 2, 3, 4])
         else:
-            nonrigid_norm = tf.zeros(ddf.shape[0])
+            nonrigid_norm = tf.zeros([tf.shape(ddf)[0]], dtype=ddf.dtype)
 
 
         if self.gradientNorm_weight > 0:
@@ -380,7 +379,7 @@ class HybridNorm(tf.keras.layers.Layer):
                 gradient_norms = dfdx ** 2 + dfdy ** 2 + dfdz ** 2
             gradient_norm = tf.reduce_mean(gradient_norms, axis=[1, 2, 3, 4])
         else:
-            gradient_norm = tf.zeros(ddf.shape[0])
+            gradient_norm = tf.zeros([tf.shape(ddf)[0]], dtype=ddf.dtype)
 
         # compute the axis difference norm
         if self.axisdiffNorm_weight > 0:
@@ -390,7 +389,7 @@ class HybridNorm(tf.keras.layers.Layer):
                 axisdiff_norms = ddf[:,:,:,:,self.axis:(self.axis+1)] ** 2
             axisdiff_norm = tf.reduce_mean(axisdiff_norms, axis=[1, 2, 3, 4])
         else:
-            axisdiff_norm = tf.zeros(ddf.shape[0])
+            axisdiff_norm = tf.zeros([tf.shape(ddf)[0]], dtype=ddf.dtype)
 
         if self.differenceNorm_weight > 0:
             if self.l1:
@@ -399,7 +398,7 @@ class HybridNorm(tf.keras.layers.Layer):
                 diff_norms = ddf ** 2
             diff_norm = tf.reduce_mean(diff_norms, axis=[1, 2, 3, 4])
         else:
-            diff_norm = tf.zeros(ddf.shape[0])
+            diff_norm = tf.zeros([tf.shape(ddf)[0]], dtype=ddf.dtype)
     
         return self.nonrigid_weight * nonrigid_norm + \
             self.gradientNorm_weight * gradient_norm + \

@@ -127,7 +127,7 @@ class Resize3d(tfkl.Layer):
         :param name: name of the layer
         """
         super().__init__(name=name)
-        assert len(shape) == 3
+        # assert len(shape) == 3
         self._shape = shape
         self._method = method
 
@@ -267,22 +267,24 @@ class Warping(tfkl.Layer):
         """Return the config dictionary for recreating this class."""
         config = super().get_config()
         config["fixed_image_size"] = self._fixed_image_size
+        config["batch_size"] = self.batch_size
         return config
 
 
 class MultiChannelWarping(tfkl.Layer):
-    def __init__(self, fixed_image_size: tuple, name: str = "multi_channel_warping", 
+    def __init__(self, fixed_image_size: tuple, batch_size: int, name: str = "multi_channel_warping", 
                  interpolation: str = "linear", **kwargs):
         super().__init__(name=name, **kwargs)
         self._fixed_image_size = fixed_image_size
         self.grid_ref = layer_util.get_reference_grid(grid_size=fixed_image_size)[None, ...]
         self.interpolation = interpolation
-        self.warping_layer = Warping(fixed_image_size, interpolation=interpolation)
+        self.batch_size = batch_size
+        self.warping_layer = Warping(fixed_image_size, batch_size, interpolation=interpolation)
 
     def call(self, inputs, **kwargs) -> tf.Tensor:
         ddf, image = inputs
 
-        # Transpose image to bring channels to the front: (batch, channels, x, y, z)
+        # Transpose image to bring channels to the front: (channels, batch, x, y, z)
         image_transposed = tf.transpose(image, perm=[4, 0, 1, 2, 3])
 
         # Apply warping using map_fn
@@ -298,6 +300,7 @@ class MultiChannelWarping(tfkl.Layer):
     def get_config(self) -> dict:
         config = super().get_config()
         config["fixed_image_size"] = self._fixed_image_size
+        config["batch_size"] = self.batch_size
         return config
 
 class CentroidWarping(tfkl.Layer):
@@ -529,7 +532,7 @@ class IntDVF(tfkl.Layer):
         :param kwargs: additional arguments.
         """
         super().__init__(name=name, **kwargs)
-        assert len(fixed_image_size) == 3
+        # assert len(fixed_image_size) == 3
         self._fixed_image_size = fixed_image_size
         self._num_steps = num_steps
         self._warping = Warping(fixed_image_size=fixed_image_size)

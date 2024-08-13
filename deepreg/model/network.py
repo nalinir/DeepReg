@@ -154,25 +154,27 @@ class RegistrationModel(tf.keras.Model):
         """
         images = []
 
-        resize_layer = layer.Resize3d(shape=self.fixed_image_size)
+        # resize_layer = layer.Resize3d(shape=self.fixed_image_size)
 
-        # (batch, m_dim1, m_dim2, m_dim3, 1)
-        moving_image = tf.expand_dims(moving_image, axis=4)
-        moving_image = resize_layer(moving_image)
+        # (batch, m_dim1, m_dim2, m_dim3, channel)
+        if len(self.moving_image_size) == 3:
+            moving_image = tf.expand_dims(moving_image, axis=len(moving_image.shape))
+        # moving_image = resize_layer(moving_image)
         images.append(moving_image)
 
-        # (batch, m_dim1, m_dim2, m_dim3, 1)
-        fixed_image = tf.expand_dims(fixed_image, axis=4)
+        # (batch, m_dim1, m_dim2, m_dim3, channel)
+        if len(self.fixed_image_size)  == 3:
+            fixed_image = tf.expand_dims(fixed_image, axis=len(fixed_image.shape))
         images.append(fixed_image)
 
         # (batch, m_dim1, m_dim2, m_dim3, 1)
         if moving_label is not None:
-            moving_label = tf.expand_dims(moving_label, axis=4)
-            moving_label = resize_layer(moving_label)
+            moving_label = tf.expand_dims(moving_label, axis=-1)
+            # moving_label = resize_layer(moving_label)
             images.append(moving_label)
 
-        # (batch, f_dim1, f_dim2, f_dim3, 2 or 3)
-        images = tf.concat(images, axis=4)
+        # (batch, f_dim1, f_dim2, f_dim3, 2*n_channel)
+        images = tf.concat(images, axis=len(moving_image.shape)-1)
         return images
 
     # TODO: add the hybrid option
@@ -223,16 +225,7 @@ class RegistrationModel(tf.keras.Model):
             )
             loss_value = loss_layer(**inputs_dict)
 
-            ### TODO: changed how loss is weighted
-            if name == "regularization":
-                hybrid = loss_config["hybrid"]
-                if hybrid:
-                    weighted_loss = loss_value
-                else:
-                    weighted_loss = loss_value * weight
-            # alternative case: weighted image loss
-            else:
-                weighted_loss = loss_value * weight
+            weighted_loss = loss_value * weight
 
             # add loss
             self._model.add_loss(weighted_loss)
@@ -485,18 +478,39 @@ class DDFModel(RegistrationModel):
         moving_image = self._inputs["moving_image"]  # (batch, m_dim1, m_dim2, m_dim3)
         fixed_image = self._inputs["fixed_image"]  # (batch, f_dim1, f_dim2, f_dim3)
 
+        print("Built inputs.")
+
         # build ddf
         control_points = self.config["backbone"].pop("control_points", False)
+
+        print("Built control points.")
         backbone_inputs = self.concat_images(moving_image, fixed_image)
-        backbone = REGISTRY.build_backbone(
-            config=self.config["backbone"],
-            default_args=dict(
-                image_size=self.fixed_image_size,
-                out_channels=3,
-                out_kernel_initializer="zeros",
-                out_activation=None,
-            ),
-        )
+        print("Concatenated images.")
+        print(self.config["backbone"])
+
+        if self.config["single_channel"]:
+            backbone = REGISTRY.build_backbone(
+                config=self.config["backbone"],
+                default_args=dict(
+                    image_size=self.fixed_image_size,
+                    out_channels=3,
+                    out_kernel_initializer="zeros",
+                    out_activation=None,
+                ),
+            )
+
+        else:
+            backbone = REGISTRY.build_backbone(
+                config=self.config["backbone"],
+                default_args=dict(
+                    image_size=self.fixed_image_size[:3],
+                    out_channels=3,
+                    out_kernel_initializer="zeros",
+                    out_activation=None,
+                ),
+            )
+
+        print("Built backbone.")
 
         if isinstance(backbone, GlobalNet):
             # (f_dim1, f_dim2, f_dim3, 3), (4, 3)
@@ -510,16 +524,27 @@ class DDFModel(RegistrationModel):
             )
             self._outputs = dict(ddf=ddf)
 
+        print("Built DDF.")
         # build outputs
-        warping = layer.Warping(fixed_image_size=self.fixed_image_size, batch_size=self.batch_size)
+        if self.config["single_channel"]:
+            warping = layer.Warping(fixed_image_size=self.fixed_image_size, batch_size=self.batch_size)
+        else:
+            warping = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size[:3], batch_size=self.batch_size)
         # (f_dim1, f_dim2, f_dim3)
         pred_fixed_image = warping(inputs=[ddf, moving_image])
         self._outputs["pred_fixed_image"] = pred_fixed_image
 
+        print("Built warping.")
+
         if not self.labeled:
             return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
+ 
+        #print("This model shouldn't be labeled.")
 
-        warping_centroids = layer.CentroidWarping(fixed_image_size=self.fixed_image_size)
+        if self.config["single_channel"]:
+            warping_centroids = layer.CentroidWarping(fixed_image_size=self.fixed_image_size)
+        else:
+            warping_centroids = layer.CentroidWarping(fixed_image_size=self.fixed_image_size[:3])
         # warping_multichannel = layer.MultiChannelWarping(fixed_image_size=self.fixed_image_size)
         # (f_dim1, f_dim2, f_dim3)
         # TODO: branch whether "moving" label should be moving image or fixed centroids based off of the label loss function, and modify loss function calling appropriately
@@ -535,6 +560,7 @@ class DDFModel(RegistrationModel):
         # print("Fixed label data type")
         # print(pred_fixed_label.dtype)
         self._outputs["pred_fixed_label"] = pred_fixed_label # for centroid inputs, this will be the predicted MOVING label
+        print("Built outputs.")
         return tf.keras.Model(inputs=self._inputs, outputs=self._outputs)
 
     def build_loss(self):

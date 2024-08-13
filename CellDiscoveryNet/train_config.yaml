@@ -1,0 +1,78 @@
+dataset:
+  fixed_image_shape:
+  - 284
+  - 120
+  - 64
+  - 4
+  moving_image_shape:
+  - 284
+  - 120
+  - 64
+  - 4
+  moving_label_shape:
+  - 200
+  - 3
+  fixed_label_shape:
+  - 200
+  - 3
+  test:
+    dir:
+      - "/data4/prj_register/multicolor_deepreg_test_5/test"
+    format: "h5"
+    labeled: false
+  train:
+    dir:
+      - "/data4/prj_register/multicolor_deepreg_test_5/train"
+    format: "h5"
+    labeled: false
+  type: paired
+  valid:
+    dir:
+      - "/data4/prj_register/multicolor_deepreg_test_5/val"
+    format: "h5"
+    labeled: false
+    sample_label: "all"
+train:
+  backbone:
+    extract_levels:
+    - 0
+    - 1
+    - 2
+    - 3
+    name: "local"
+    num_channel_initial: 16
+  epochs: 300
+  loss:
+    image:
+      name: "gncc"
+      weight: 1
+    regularization:
+      img_size:
+      - 284
+      - 120
+      - 64
+      - 4
+      name: "hybrid"
+      weight: 1
+      hybrid_weight:
+        "axisdiff": 0.0
+        "gradient": 0.05
+        "nonrigid": 0.05
+        "diff": 0.0025
+  method: "ddf"
+  optimizer:
+    learning_rate: 0.0001
+    name: "Adam"
+  preprocess:
+    data_augmentation:
+      name: "centroid_affine"
+      moving_label_size:
+        - 200
+        - 3
+      fixed_label_size:
+        - 200
+        - 3
+    batch_size: 5
+    num_parallel_calls: -1
+    shuffle_buffer_num_batch: 2
+  save_period: 1
