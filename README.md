@@ -95,6 +95,14 @@ and education in medical image registration using deep learning.**
 - [Medical Image Registration Demos using DeepReg](https://deepreg.readthedocs.io/en/latest/demo/introduction.html)
 - [Issue Tracker](https://github.com/DeepRegNet/DeepReg/issues/new/choose)
 
+## BrainAlignNet
+
+This package implements the network used in BrainAlignNet. For more information please see [the BrainAlignNet package](https://github.com/flavell-lab/BrainAlignNet).
+
+## CellDiscoveryNet
+
+See [CellDiscoveryNet](https://github.com/flavell-lab/DeepReg/tree/main/CellDiscoveryNet) for instructions on how to create training datasets for CellDiscoveryNet, as well as the training notebook and configuration file.
+
 ## Contributing
 
 Get involved, and help make DeepReg better! We want your help - **Really**.
@@ -130,6 +138,8 @@ Check it out
 [here](https://github.com/DeepRegNet/DeepReg/blob/main/docs/Intro_to_Medical_Image_Registration.ipynb) -
 you can also
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DeepRegNet/DeepReg/blob/main/docs/Intro_to_Medical_Image_Registration.ipynb)
+
+
 
 ## Overview Video
 
@@ -167,3 +177,11 @@ Or with BibTex:
   journal = {Journal of Open Source Software}
 }
 ```
+
+Also, if you are using this fork of DeepReg for either CellDiscoveryNet or BrainAlignNet, please also cite:
+
+#### Deep Neural Networks to Register and Annotate the Cells of the *C. elegans* Nervous System
+Adam A. Atanas, Alicia Kun-Yang Lu, Jungsoo Kim, Saba Baskoylu, Di Kang, Talya S. Kramer, Eric Bueno, Flossie K. Wan, Steven W. Flavell
+
+bioRxiv 2024; doi: https://doi.org/10.1101/2024.07.18.601886
+
