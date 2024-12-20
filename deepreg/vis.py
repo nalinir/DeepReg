@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.matlib
 
-from deepreg import log
-from deepreg.dataset.loader.nifti_loader import load_nifti_file
-from deepreg.model.layer import Warping
+from DeepReg.deepreg import log
+from DeepReg.deepreg.dataset.loader.nifti_loader import load_nifti_file
+from DeepReg.deepreg.model.layer import Warping
 
 logger = log.get(__name__)
 

@@ -3,8 +3,8 @@ from typing import Dict, List, Union
 
 import yaml
 
-from deepreg import log
-from deepreg.config.v011 import parse_v011
+from DeepReg.deepreg import log
+from DeepReg.deepreg.config.v011 import parse_v011
 
 logger = log.get(__name__)
 

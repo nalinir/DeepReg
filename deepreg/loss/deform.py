@@ -3,8 +3,8 @@ from typing import Callable, Tuple
 
 import tensorflow as tf
 
-from deepreg.registry import REGISTRY
-from deepreg.model import layer_util
+from DeepReg.deepreg.registry import REGISTRY
+from DeepReg.deepreg.model import layer_util
 
 
 def gradient_dx(fx: tf.Tensor) -> tf.Tensor:

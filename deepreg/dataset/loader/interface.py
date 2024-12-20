@@ -8,11 +8,11 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import tensorflow as tf
 
-from deepreg import log
-from deepreg.dataset.loader.util import normalize_array
-from deepreg.dataset.preprocess import resize_inputs
-from deepreg.dataset.util import get_label_indices
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg import log
+from DeepReg.deepreg.dataset.loader.util import normalize_array
+from DeepReg.deepreg.dataset.preprocess import resize_inputs
+from DeepReg.deepreg.dataset.util import get_label_indices
+from DeepReg.deepreg.registry import REGISTRY
 
 logger = log.get(__name__)
 
@@ -143,6 +143,7 @@ class DataLoader:
             if isinstance(data_augmentation, dict):
                 data_augmentation = [data_augmentation]
             for config in data_augmentation:
+
                 da_fn = REGISTRY.build_data_augmentation(
                     config=config,
                     default_args={

@@ -6,10 +6,10 @@ import tensorflow as tf
 import tensorflow.keras.layers as tfkl
 from tensorflow.python.keras.utils import conv_utils
 
-from deepreg.model import layer, layer_util
-from deepreg.model.backbone.interface import Backbone
-from deepreg.model.layer import Extraction
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.model import layer, layer_util
+from DeepReg.deepreg.model.backbone.interface import Backbone
+from DeepReg.deepreg.model.layer import Extraction
+from DeepReg.deepreg.registry import REGISTRY
 
 
 @REGISTRY.register_backbone(name="unet")

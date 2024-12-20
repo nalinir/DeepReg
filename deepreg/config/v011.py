@@ -3,7 +3,7 @@
 from copy import deepcopy
 from typing import Dict
 
-from deepreg.constant import KNOWN_DATA_SPLITS
+from DeepReg.deepreg.constant import KNOWN_DATA_SPLITS
 
 
 def parse_v011(old_config: Dict) -> Dict:

@@ -4,8 +4,8 @@ from typing import List, Optional, Union
 
 import tensorflow as tf
 
-from deepreg.loss.kernel import cauchy_kernel1d
-from deepreg.loss.kernel import gaussian_kernel1d_sigma as gaussian_kernel1d
+from DeepReg.deepreg.loss.kernel import cauchy_kernel1d
+from DeepReg.deepreg.loss.kernel import gaussian_kernel1d_sigma as gaussian_kernel1d
 
 
 class MultiScaleMixin(tf.keras.losses.Loss):

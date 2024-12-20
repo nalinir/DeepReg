@@ -16,6 +16,6 @@ import os
 if os.getenv("TF_CPP_MIN_LOG_LEVEL") is None:
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # or any {"0", "1", "2", "3"}
 
-import deepreg.dataset
-import deepreg.loss
-import deepreg.model
+import DeepReg.deepreg.dataset
+import DeepReg.deepreg.loss
+import DeepReg.deepreg.model

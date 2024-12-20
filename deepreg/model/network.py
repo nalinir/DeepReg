@@ -5,11 +5,11 @@ from typing import Dict, Optional, Tuple
 
 import tensorflow as tf
 
-from deepreg import log
-from deepreg.loss.label import compute_centroid_distance
-from deepreg.model import layer, layer_util
-from deepreg.model.backbone import GlobalNet
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg import log
+from DeepReg.deepreg.loss.label import compute_centroid_distance
+from DeepReg.deepreg.model import layer, layer_util
+from DeepReg.deepreg.model.backbone import GlobalNet
+from DeepReg.deepreg.registry import REGISTRY
 
 logger = log.get(__name__)
 
@@ -69,6 +69,56 @@ class RegistrationModel(tf.keras.Model):
         ]
         self._model: tf.keras.Model = self.build_model()
         self.build_loss()
+    '''
+    def train_step(self, data):
+        # Unpack the data. Its structure depends on your model and
+        # on what you pass to `fit()`.
+        print(f'data is {data}')
+        moving_image = data['moving_image']
+        fixed_image = data['fixed_image']
+        moving_label = data['moving_label']
+        fixed_label = data['fixed_label']
+        indices = data['indices']
+        
+        # Print out tensor values using tf.print
+        print('test')
+        print("Eager Execution:", tf.executing_eagerly())
+        tf.print("moving_image:", moving_image)
+        tf.print("moving_image:", tf.math.is_nan(moving_image))
+        tf.print("fixed_image:", tf.math.is_nan(fixed_image))
+        tf.print("moving_label:", tf.math.is_nan(moving_label))
+        tf.print("fixed_label:", tf.math.is_nan(fixed_label))
+        tf.print("indices:", tf.math.is_nan(indices))
+        tf.print("moving_image:", tf.math.is_inf(moving_image))
+        tf.print("fixed_image:", tf.math.is_inf(fixed_image))
+        tf.print("moving_label:", tf.math.is_inf(moving_label))
+        tf.print("fixed_label:", tf.math.is_inf(fixed_label))
+        tf.print("indices:", tf.math.is_inf(indices))
+        print('test end')
+        for tensorkey in data.keys():
+            print(f'{tensorkey}:{data[tensorkey]}')
+        x, y = data
+
+        with tf.GradientTape() as tape:
+            y_pred = self(x, training=True)  # Forward pass
+            # Compute the loss value
+            # (the loss function is configured in `compile()`)
+            print(f'y_pred iin train_step s {y_pred}')
+            loss = self.compute_loss(y=y, y_pred=y_pred)
+
+        # Compute gradients
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        # Update weights
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+        # Update metrics (includes the metric that tracks the loss)
+        for metric in self.metrics:
+            if metric.name == "loss":
+                metric.update_state(loss)
+            else:
+                metric.update_state(y, y_pred)
+        # Return a dict mapping metric names to current value
+        return {m.name: m.result() for m in self.metrics}'''
 
     def get_config(self) -> dict:
         """Return the config dictionary for recreating this class."""
@@ -85,7 +135,7 @@ class RegistrationModel(tf.keras.Model):
     @abstractmethod
     def build_model(self):
         """Build the model to be saved as self._model."""
-
+    '''
     def build_inputs(self) -> Dict[str, tf.keras.layers.Input]:
         """
         Build input tensors.
@@ -175,7 +225,129 @@ class RegistrationModel(tf.keras.Model):
 
         # (batch, f_dim1, f_dim2, f_dim3, 2*n_channel)
         images = tf.concat(images, axis=len(moving_image.shape)-1)
+        return images'''
+    def build_inputs(self) -> Dict[str, tf.keras.layers.Input]:
+        """
+        Build input tensors.
+
+        :return: dict of inputs.
+        """
+        # (batch, m_dim1, m_dim2, m_dim3)
+        moving_image = tf.keras.Input(
+            shape=self.moving_image_size,
+            batch_size=self.batch_size,
+            name="moving_image",
+        )
+
+        # Check if moving_image tensor has NaN or Inf values
+        tf.debugging.check_numerics(moving_image, message="NaN or Inf detected in moving_image")
+
+        # (batch, f_dim1, f_dim2, f_dim3)
+        fixed_image = tf.keras.Input(
+            shape=self.fixed_image_size,
+            batch_size=self.batch_size,
+            name="fixed_image",
+        )
+
+        # Check if fixed_image tensor has NaN or Inf values
+        tf.debugging.check_numerics(fixed_image, message="NaN or Inf detected in fixed_image")
+
+        # (batch, index_size)
+        indices = tf.keras.Input(
+            shape=(self.index_size,),
+            batch_size=self.batch_size,
+            name="indices",
+        )
+        # Check if indices tensor has NaN or Inf values
+        tf.debugging.check_numerics(indices, message="NaN or Inf detected in indices")
+
+        if not self.labeled:
+            return dict(
+                moving_image=moving_image, fixed_image=fixed_image, indices=indices
+            )
+
+        # (batch, m_dim1, m_dim2, m_dim3)
+        moving_label = tf.keras.Input(
+            shape=self.moving_image_size,
+            batch_size=self.batch_size,
+            name="moving_label",
+            dtype=tf.int32
+        )
+
+        # Check if moving_label tensor has NaN or Inf values
+        tf.debugging.check_numerics(moving_label, message="NaN or Inf detected in moving_label")
+
+        # (batch, m_dim1, m_dim2, m_dim3)
+        fixed_label = tf.keras.Input(
+            shape=self.fixed_image_size,
+            batch_size=self.batch_size,
+            name="fixed_label",
+            dtype=tf.float32
+        )
+
+        # Check if fixed_label tensor has NaN or Inf values
+        tf.debugging.check_numerics(fixed_label, message="NaN or Inf detected in fixed_label")
+
+        return dict(
+            moving_image=moving_image,
+            fixed_image=fixed_image,
+            moving_label=moving_label,
+            fixed_label=fixed_label,
+            indices=indices,
+        )
+    
+    def concat_images(
+        self,
+        moving_image: tf.Tensor,
+        fixed_image: tf.Tensor,
+        moving_label: Optional[tf.Tensor] = None,
+    ) -> tf.Tensor:
+        """
+        Adjust image shape and concatenate them together.
+
+        :param moving_image: registration source
+        :param fixed_image: registration target
+        :param moving_label: optional, only used for conditional model.
+        :return:
+        """
+        images = []
+
+        # Check for NaNs or Infs in moving_image and fixed_image before modifying them
+        tf.debugging.check_numerics(moving_image, message="NaN or Inf detected in moving_image before expansion")
+        tf.debugging.check_numerics(fixed_image, message="NaN or Inf detected in fixed_image before expansion")
+
+        # Resize images if they are 3D
+        if len(self.moving_image_size) == 3:
+            moving_image = tf.expand_dims(moving_image, axis=len(moving_image.shape))
+        images.append(moving_image)
+
+        # Check for NaNs or Infs after expanding moving_image
+        tf.debugging.check_numerics(moving_image, message="NaN or Inf detected in moving_image after expansion")
+
+        if len(self.fixed_image_size) == 3:
+            fixed_image = tf.expand_dims(fixed_image, axis=len(fixed_image.shape))
+        images.append(fixed_image)
+
+        # Check for NaNs or Infs after expanding fixed_image
+        tf.debugging.check_numerics(fixed_image, message="NaN or Inf detected in fixed_image after expansion")
+
+        # Check moving_label if it exists
+        if moving_label is not None:
+            moving_label = tf.expand_dims(moving_label, axis=-1)
+            images.append(moving_label)
+
+            # Check for NaNs or Infs in moving_label
+            tf.debugging.check_numerics(moving_label, message="NaN or Inf detected in moving_label after expansion")
+
+        # Concatenate images along the last axis (channel axis)
+        images = tf.concat(images, axis=len(moving_image.shape) - 1)
+
+        # Check for NaNs or Infs in the concatenated result
+        tf.debugging.check_numerics(images, message="NaN or Inf detected in concatenated images")
+
         return images
+
+
 
     # TODO: add the hybrid option
     def _build_loss(self, name: str, inputs_dict: dict):
@@ -454,6 +626,11 @@ class DDFModel(RegistrationModel):
             name="fixed_label",
             dtype=tf.float32
         )
+        print(f'input fixed image: {fixed_image}')
+        print(f'input moving image: {moving_image}')
+        print(f'input fixed label: {fixed_label}')
+        print(f'self fixed label size: {self.fixed_label_size}')
+        print(f'input moving label: {moving_label}')
         return dict(
             moving_image=moving_image,
             fixed_image=fixed_image,

@@ -8,11 +8,11 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-import deepreg.loss.label as label_loss
-from deepreg import log
-from deepreg.dataset.load import get_data_loader
-from deepreg.dataset.loader.interface import DataLoader
-from deepreg.dataset.loader.util import normalize_array
+import DeepReg.deepreg.loss.label as label_loss
+from DeepReg.deepreg import log
+from DeepReg.deepreg.dataset.load import get_data_loader
+from DeepReg.deepreg.dataset.loader.interface import DataLoader
+from DeepReg.deepreg.dataset.loader.util import normalize_array
 
 logger = log.get(__name__)
 
@@ -158,6 +158,7 @@ def calculate_metrics(
     :param sample_index: int,
     :return: dictionary of metrics
     """
+    print('calculating metrics')
 
     if pred_fixed_image is not None:
         y_true = fixed_image[sample_index : (sample_index + 1), :, :, :]

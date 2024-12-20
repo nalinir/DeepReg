@@ -1,11 +1,11 @@
 """Provide different loss or metrics classes for images."""
 import tensorflow as tf
 
-from deepreg.constant import EPS
-from deepreg.loss.kernel import gaussian_kernel1d_size as gaussian_kernel1d
-from deepreg.loss.kernel import rectangular_kernel1d, triangular_kernel1d
-from deepreg.loss.util import NegativeLossMixin, separable_filter
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.constant import EPS
+from DeepReg.deepreg.loss.kernel import gaussian_kernel1d_size as gaussian_kernel1d
+from DeepReg.deepreg.loss.kernel import rectangular_kernel1d, triangular_kernel1d
+from DeepReg.deepreg.loss.util import NegativeLossMixin, separable_filter
+from DeepReg.deepreg.registry import REGISTRY
 
 
 class GlobalMutualInformation(tf.keras.losses.Loss):
@@ -207,6 +207,19 @@ class LocalNormalizedCrossCorrelation(tf.keras.losses.Loss):
         p2 = y_pred * y_pred
         tp = y_true * y_pred
 
+        print('LNCC loss in Deepreg')
+        print(f'y_true: {y_true}')
+        print(f'y_pred: {y_pred}')
+        print(f't2: {t2}')
+        print(f'p2: {p2}')
+        print(f'tp: {tp}')
+
+        
+        # Check for NaNs or Infs
+        tf.debugging.check_numerics(y_true, message="NaN or Inf detected in y_true")
+        tf.debugging.check_numerics(y_pred, message="NaN or Inf detected in y_pred")
+
+
         # sum over kernel
         # (batch, dim1, dim2, dim3, 1)
         t_sum = separable_filter(y_true, kernel=self.kernel)  # E[t] * E[1]
@@ -215,10 +228,19 @@ class LocalNormalizedCrossCorrelation(tf.keras.losses.Loss):
         p2_sum = separable_filter(p2, kernel=self.kernel)  # E[pp] * E[1]
         tp_sum = separable_filter(tp, kernel=self.kernel)  # E[tp] * E[1]
 
+        tf.debugging.check_numerics(t_sum, message="NaN or Inf detected in y_true")
+        tf.debugging.check_numerics(p_sum, message="NaN or Inf detected in y_pred")
+        tf.debugging.check_numerics(t2_sum, message="NaN or Inf detected in y_true")
+        tf.debugging.check_numerics(p2_sum, message="NaN or Inf detected in y_pred")
+        tf.debugging.check_numerics(tp_sum, message="NaN or Inf detected in y_true")
+
         # average over kernel
         # (batch, dim1, dim2, dim3, 1)
         t_avg = t_sum / self.kernel_vol  # E[t]
         p_avg = p_sum / self.kernel_vol  # E[p]
+
+        tf.debugging.check_numerics(t_avg, message="NaN or Inf detected in y_true")
+        tf.debugging.check_numerics(p_avg, message="NaN or Inf detected in y_pred")
 
         # shape = (batch, dim1, dim2, dim3, 1)
         cross = tp_sum - p_avg * t_sum  # E[tp] * E[1] - E[p] * E[t] * E[1]
@@ -231,6 +253,9 @@ class LocalNormalizedCrossCorrelation(tf.keras.losses.Loss):
 
         # (E[tp] - E[p] * E[t]) ** 2 / V[t] / V[p]
         ncc = (cross * cross) / (t_var * p_var + self.smooth_dr)
+        tf.debugging.check_numerics(ncc, message="NaN or Inf detected in y_pred")
+
+        print(f'ncc is: {ncc}')
 
         return ncc
 
@@ -332,6 +357,10 @@ class GlobalNormalizedCrossCorrelation(tf.keras.losses.Loss):
         numerator = tf.abs(
             tf.reduce_mean((y_pred - mu_pred) * (y_true - mu_true), axis=axis)
         )
+
+        print('GNCC loss in Deepreg')
+        print(f'y_true: {y_true}')
+        print(f'y_pred: {y_pred}')
 
         gncc_per_channel = (numerator * numerator) / (var_pred * var_true)
 

@@ -6,12 +6,12 @@ Image data can be labeled or unlabeled.
 import random
 from typing import List, Tuple, Union
 
-from deepreg.dataset.loader.interface import (
+from DeepReg.deepreg.dataset.loader.interface import (
     AbstractUnpairedDataLoader,
     GeneratorDataLoader,
 )
-from deepreg.dataset.util import check_difference_between_two_lists
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.dataset.util import check_difference_between_two_lists
+from DeepReg.deepreg.registry import REGISTRY
 
 
 @REGISTRY.register_data_loader(name="unpaired")

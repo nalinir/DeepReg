@@ -9,9 +9,9 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import tensorflow as tf
 
-from deepreg.model.layer import Resize3d
-from deepreg.model.layer_util import get_reference_grid, resample, warp_grid
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.model.layer import Resize3d
+from DeepReg.deepreg.model.layer_util import get_reference_grid, resample, warp_grid
+from DeepReg.deepreg.registry import REGISTRY
 
 
 class RandomTransformation3D(tf.keras.layers.Layer):
@@ -100,8 +100,12 @@ class RandomTransformation3D(tf.keras.layers.Layer):
         moving_label = inputs["moving_label"]
         fixed_label = inputs["fixed_label"]
 
+        print(f'moving label before transform: {moving_label}')
+
         moving_label = self.transform(moving_label, self.moving_grid_ref, moving_params, self.batch_size)
         fixed_label = self.transform(fixed_label, self.fixed_grid_ref, fixed_params, self.batch_size)
+
+        print(f'moving label after transform: {moving_label}')
 
         return dict(
             moving_image=moving_image,
@@ -152,6 +156,7 @@ class RandomCentroidLabelAffineTransform3D(RandomTransformation3D):
             **kwargs,
         )
         self.moving_label_size = moving_label_size
+        print(f'label size in preprocess: {fixed_label_size}')
         self.fixed_label_size = fixed_label_size
         self.scale = scale
 

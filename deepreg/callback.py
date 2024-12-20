@@ -35,7 +35,7 @@ class CheckpointManagerCallback(tf.keras.callbacks.Callback):
     def restore(self, save_path=None):
         if save_path is None:
             save_path = self._manager.latest_checkpoint
-        self._checkpoint.restore(save_path)
+        self._checkpoint.restore(save_path).expect_partial() #new
         self._restored = True
 
     def on_train_begin(self, logs=None):

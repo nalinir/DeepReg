@@ -7,8 +7,8 @@ from typing import List, Tuple, Union
 import h5py
 import numpy as np
 
-from deepreg.dataset.loader.interface import FileLoader
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.dataset.loader.interface import FileLoader
+from DeepReg.deepreg.registry import REGISTRY
 
 DATA_KEY_FORMAT = "group-{}-{}"
 

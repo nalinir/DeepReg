@@ -138,6 +138,7 @@ class Registry:
                 args.setdefault(name, value)
 
         name = args.pop("name")
+        print(f'category:{category}, key: {name}')
         cls = self.get(category=category, key=name)
         try:
             return cls(**args)
@@ -179,6 +180,7 @@ class Registry:
         :param default_args: optionally some default arguments.
         :return: a model instance
         """
+        print('using local deepreg')
         return self.build_from_config(
             category=MODEL_CLASS, config=config, default_args=default_args
         )

@@ -4,9 +4,9 @@ from typing import List, Tuple, Union
 import nibabel as nib
 import numpy as np
 
-from deepreg.dataset.loader.interface import FileLoader
-from deepreg.dataset.util import get_sorted_file_paths_in_dir_with_suffix
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.dataset.loader.interface import FileLoader
+from DeepReg.deepreg.dataset.util import get_sorted_file_paths_in_dir_with_suffix
+from DeepReg.deepreg.registry import REGISTRY
 
 DATA_FILE_SUFFIX = ["nii.gz", "nii"]
 

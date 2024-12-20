@@ -2,9 +2,9 @@ import os
 from copy import deepcopy
 from typing import Optional
 
-from deepreg.constant import KNOWN_DATA_SPLITS
-from deepreg.dataset.loader.interface import DataLoader
-from deepreg.registry import FILE_LOADER_CLASS, REGISTRY
+from DeepReg.deepreg.constant import KNOWN_DATA_SPLITS
+from DeepReg.deepreg.dataset.loader.interface import DataLoader
+from DeepReg.deepreg.registry import FILE_LOADER_CLASS, REGISTRY
 
 
 def get_data_loader(data_config: dict, split: str) -> Optional[DataLoader]:

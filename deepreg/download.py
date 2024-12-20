@@ -11,7 +11,7 @@ from io import BytesIO
 from urllib.request import urlopen
 from zipfile import ZipFile
 
-from deepreg import log
+from DeepReg.deepreg import log
 
 logger = log.get(__name__)
 

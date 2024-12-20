@@ -5,10 +5,10 @@ from typing import List, Optional, Tuple, Union
 import tensorflow as tf
 import tensorflow.keras.layers as tfkl
 
-from deepreg.model import layer
-from deepreg.model.backbone.u_net import UNet
-from deepreg.model.layer import Extraction
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.model import layer
+from DeepReg.deepreg.model.backbone.u_net import UNet
+from DeepReg.deepreg.model.layer import Extraction
+from DeepReg.deepreg.registry import REGISTRY
 
 
 class AdditiveUpsampling(tfkl.Layer):

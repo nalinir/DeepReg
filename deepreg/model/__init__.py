@@ -1,3 +1,3 @@
 # flake8: noqa
-import deepreg.model.backbone
-import deepreg.model.network
+import DeepReg.deepreg.model.backbone
+import DeepReg.deepreg.model.network

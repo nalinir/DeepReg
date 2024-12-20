@@ -6,9 +6,9 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras.layers as tfkl
 
-from deepreg.model import layer_util
-from deepreg.model.backbone.u_net import UNet
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.model import layer_util
+from DeepReg.deepreg.model.backbone.u_net import UNet
+from DeepReg.deepreg.registry import REGISTRY
 
 
 class AffineHead(tfkl.Layer):

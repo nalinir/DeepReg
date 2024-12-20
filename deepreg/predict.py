@@ -13,13 +13,13 @@ from typing import Dict, List, Tuple, Union
 import numpy as np
 import tensorflow as tf
 
-import deepreg.config.parser as config_parser
-import deepreg.model.layer_util as layer_util
-import deepreg.model.optimizer as opt
-from deepreg import log
-from deepreg.callback import build_checkpoint_callback
-from deepreg.registry import REGISTRY
-from deepreg.util import (
+import DeepReg.deepreg.config.parser as config_parser
+import DeepReg.deepreg.model.layer_util as layer_util
+import DeepReg.deepreg.model.optimizer as opt
+from DeepReg.deepreg import log
+from DeepReg.deepreg.callback import build_checkpoint_callback
+from DeepReg.deepreg.registry import REGISTRY
+from DeepReg.deepreg.util import (
     build_dataset,
     build_log_dir,
     calculate_metrics,

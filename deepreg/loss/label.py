@@ -2,9 +2,9 @@
 
 import tensorflow as tf
 
-from deepreg.constant import EPS
-from deepreg.loss.util import MultiScaleMixin, NegativeLossMixin
-from deepreg.registry import REGISTRY
+from DeepReg.deepreg.constant import EPS
+from DeepReg.deepreg.loss.util import MultiScaleMixin, NegativeLossMixin
+from DeepReg.deepreg.registry import REGISTRY
 
 
 class SumSquaredDifference(tf.keras.losses.Loss):
@@ -359,6 +359,11 @@ class CentroidDistScore(tf.keras.losses.Loss):
         displacement = tf.where(mask_expanded, 0.0, y_pred - tf.cast(y_true, tf.float32))
         distance = tf.norm(displacement, axis=-1)
         
+        print('in centroid loss Deepreg')
+        print(f'y_true:{y_true}')
+        print(f'y_pred:{y_pred}')
+        print(f'dist:{distance}')
+        
         return (tf.reduce_sum(distance, axis=-1) + self.smooth_nr) / (tf.reduce_sum(1.0-tf.cast(mask, dtype=tf.float32), axis=-1) + self.smooth_dr)
 
     def get_config(self) -> dict:
@@ -423,6 +428,7 @@ class CrossEntropy(tf.keras.losses.Loss):
         # (batch, ...) -> (batch, d)
         y_true = self.flatten(y_true)
         y_pred = self.flatten(y_pred)
+
 
         loss_fg = -tf.reduce_mean(y_true * tf.math.log(y_pred + self.smooth), axis=1)
         if self.background_weight > 0:
@@ -561,6 +567,10 @@ def compute_centroid(mask: tf.Tensor, grid: tf.Tensor) -> tf.Tensor:
     masked_grid = bool_mask * grid  # (batch, dim1, dim2, dim3, 3)
     numerator = tf.reduce_sum(masked_grid, axis=[1, 2, 3])  # (batch, 3)
     denominator = tf.reduce_sum(bool_mask, axis=[1, 2, 3])  # (batch, 1)
+    print(f"denom:{denominator}")
+    print(f"mask:{mask}")
+    print(f"grid:{grid}")
+
     return (numerator + EPS) / (denominator + EPS)  # (batch, 3)
 
 
